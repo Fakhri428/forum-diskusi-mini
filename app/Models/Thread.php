@@ -22,14 +22,20 @@ public function user()
     return $this->belongsTo(User::class);
 }
 
+/**
+ * Get all of the votes for the thread.
+ */
 public function votes()
 {
     return $this->hasMany(Vote::class);
 }
 
+/**
+ * Calculate vote score for the thread.
+ */
 public function voteScore()
 {
-    return $this->votes()->sum('value');
+    return $this->votes->sum('value');
 }
 public function category()
 {

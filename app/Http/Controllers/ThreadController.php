@@ -88,10 +88,21 @@ public function store(Request $request)
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
-    {
-        //
-    }
+
+public function show(Thread $thread)
+{
+    // Eager load comments with users, votes and child comments
+    $thread->load(['user', 'category', 'tags',
+                  'comments' => function ($query) {
+                      $query->whereNull('parent_id')
+                           ->with(['user', 'votes',
+                                  'children' => function ($query) {
+                                      $query->with(['user', 'votes']);
+                                  }]);
+                  }]);
+
+    return view('threads.show', compact('thread'));
+}
 
     /**
      * Show the form for editing the specified resource.

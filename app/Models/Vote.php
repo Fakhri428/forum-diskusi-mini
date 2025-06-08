@@ -2,16 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Vote extends Model
 {
-    protected $fillable = [
-        'user_id',
-        'thread_id',
-        'comment_id',
-        'value',
-    ];
+    use HasFactory;
+
+    protected $fillable = ['user_id', 'thread_id', 'comment_id', 'value'];
 
     public function user()
     {
@@ -27,6 +25,4 @@ class Vote extends Model
     {
         return $this->belongsTo(Comment::class);
     }
-
-    
 }
