@@ -1,5 +1,8 @@
-<!-- filepath: /home/helixstars/LAMPP/www/disquseria/resources/views/statistics.blade.php -->
+{{-- filepath: resources/views/statistics.blade.php --}}
+
 @extends('layouts.app')
+
+@section('title', 'Statistik Forum')
 
 @section('styles')
 <style>
@@ -90,7 +93,9 @@
 
 @section('content')
 <div class="container-fluid py-4">
-    <h1 class="mb-4">Statistik Forum</h1>
+    <h1 class="mb-4">
+        <i class="fas fa-chart-bar me-2"></i>Statistik Forum
+    </h1>
 
     <!-- Overview Stats Row -->
     <div class="row">
@@ -99,7 +104,15 @@
                 <div class="stats-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-0">{{ App\Models\Thread::count() }}</h3>
+                            @php
+                                $totalThreads = 0;
+                                try {
+                                    $totalThreads = \App\Models\Thread::count();
+                                } catch (\Exception $e) {
+                                    $totalThreads = 0;
+                                }
+                            @endphp
+                            <h3 class="mb-0">{{ $totalThreads }}</h3>
                             <p class="mb-0">Total Thread</p>
                         </div>
                         <div class="stats-icon">
@@ -124,7 +137,15 @@
                 <div class="stats-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%)">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-0">{{ App\Models\Comment::count() }}</h3>
+                            @php
+                                $totalComments = 0;
+                                try {
+                                    $totalComments = \App\Models\Comment::count();
+                                } catch (\Exception $e) {
+                                    $totalComments = 0;
+                                }
+                            @endphp
+                            <h3 class="mb-0">{{ $totalComments }}</h3>
                             <p class="mb-0">Total Komentar</p>
                         </div>
                         <div class="stats-icon">
@@ -149,7 +170,15 @@
                 <div class="stats-header" style="background: linear-gradient(to right, #f46b45, #eea849)">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-0">{{ App\Models\User::count() }}</h3>
+                            @php
+                                $totalUsers = 0;
+                                try {
+                                    $totalUsers = \App\Models\User::count();
+                                } catch (\Exception $e) {
+                                    $totalUsers = 0;
+                                }
+                            @endphp
+                            <h3 class="mb-0">{{ $totalUsers }}</h3>
                             <p class="mb-0">Total Pengguna</p>
                         </div>
                         <div class="stats-icon">
@@ -174,7 +203,19 @@
                 <div class="stats-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h3 class="mb-0">{{ App\Models\Vote::count() }}</h3>
+                            @php
+                                $totalVotes = 0;
+                                try {
+                                    if (class_exists('\App\Models\Vote')) {
+                                        $totalVotes = \App\Models\Vote::count();
+                                    } else {
+                                        $totalVotes = \App\Models\Thread::sum('vote_score');
+                                    }
+                                } catch (\Exception $e) {
+                                    $totalVotes = 0;
+                                }
+                            @endphp
+                            <h3 class="mb-0">{{ $totalVotes }}</h3>
                             <p class="mb-0">Total Vote</p>
                         </div>
                         <div class="stats-icon">
@@ -233,33 +274,58 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
-                        @foreach(App\Models\Thread::with('user')->latest()->take(3)->get() as $thread)
+                        @php
+                            $recentThreads = collect();
+                            $recentComments = collect();
+
+                            try {
+                                $recentThreads = \App\Models\Thread::with('user')->latest()->take(3)->get();
+                            } catch (\Exception $e) {
+                                $recentThreads = collect();
+                            }
+
+                            try {
+                                $recentComments = \App\Models\Comment::with(['user', 'thread'])->latest()->take(3)->get();
+                            } catch (\Exception $e) {
+                                $recentComments = collect();
+                            }
+                        @endphp
+
+                        @forelse($recentThreads as $thread)
                         <div class="list-group-item timeline-item">
                             <div class="activity-badge badge-thread position-absolute start-0 top-0">
                                 <i class="fas fa-comments"></i>
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="mb-1">{{ $thread->title }}</h6>
+                                <h6 class="mb-1">{{ $thread->title ?? 'Thread Tanpa Judul' }}</h6>
                                 <small class="text-muted">{{ $thread->created_at->diffForHumans() }}</small>
                             </div>
-                            <p class="mb-1 text-muted">{{ Str::limit($thread->body, 80) }}</p>
-                            <small>oleh {{ $thread->user->name }}</small>
+                            <p class="mb-1 text-muted">{{ Str::limit($thread->body ?? '', 80) }}</p>
+                            <small>oleh {{ $thread->user->name ?? 'Unknown User' }}</small>
                         </div>
-                        @endforeach
+                        @empty
+                        <div class="list-group-item">
+                            <p class="text-muted text-center mb-0">Belum ada thread terbaru</p>
+                        </div>
+                        @endforelse
 
-                        @foreach(App\Models\Comment::with(['user', 'thread'])->latest()->take(3)->get() as $comment)
+                        @forelse($recentComments as $comment)
                         <div class="list-group-item timeline-item">
                             <div class="activity-badge badge-comment position-absolute start-0 top-0">
                                 <i class="fas fa-reply"></i>
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="mb-1">Komentar pada "{{ $comment->thread->title }}"</h6>
+                                <h6 class="mb-1">Komentar pada "{{ $comment->thread->title ?? 'Thread' }}"</h6>
                                 <small class="text-muted">{{ $comment->created_at->diffForHumans() }}</small>
                             </div>
-                            <p class="mb-1 text-muted">{{ Str::limit($comment->body, 80) }}</p>
-                            <small>oleh {{ $comment->user->name }}</small>
+                            <p class="mb-1 text-muted">{{ Str::limit($comment->body ?? '', 80) }}</p>
+                            <small>oleh {{ $comment->user->name ?? 'Unknown User' }}</small>
                         </div>
-                        @endforeach
+                        @empty
+                        <div class="list-group-item">
+                            <p class="text-muted text-center mb-0">Belum ada komentar terbaru</p>
+                        </div>
+                        @endforelse
                     </div>
                 </div>
             </div>
@@ -272,23 +338,40 @@
                 </div>
                 <div class="card-body">
                     <ul class="list-unstyled">
-                        @foreach(App\Models\User::withCount(['threads', 'comments'])->orderByDesc('threads_count')->take(5)->get() as $user)
+                        @php
+                            $activeUsers = collect();
+                            try {
+                                $activeUsers = \App\Models\User::withCount(['threads', 'comments'])
+                                    ->orderByDesc('threads_count')
+                                    ->take(5)
+                                    ->get();
+                            } catch (\Exception $e) {
+                                $activeUsers = collect();
+                            }
+                        @endphp
+
+                        @forelse($activeUsers as $user)
                         <li class="mb-3 pb-3 border-bottom">
                             <div class="d-flex align-items-center">
                                 <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
                                     style="width: 50px; height: 50px; font-weight: bold; background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;">
-                                    {{ strtoupper(substr($user->name, 0, 1)) }}
+                                    {{ strtoupper(substr($user->name ?? 'U', 0, 1)) }}
                                 </div>
                                 <div class="flex-grow-1">
-                                    <h6 class="mb-0">{{ $user->name }}</h6>
+                                    <h6 class="mb-0">{{ $user->name ?? 'Unknown User' }}</h6>
                                     <div class="d-flex text-muted small">
-                                        <span class="me-3"><i class="fas fa-comments me-1"></i>{{ $user->threads_count }} thread</span>
-                                        <span><i class="fas fa-reply me-1"></i>{{ $user->comments_count }} komentar</span>
+                                        <span class="me-3"><i class="fas fa-comments me-1"></i>{{ $user->threads_count ?? 0 }} thread</span>
+                                        <span><i class="fas fa-reply me-1"></i>{{ $user->comments_count ?? 0 }} komentar</span>
                                     </div>
                                 </div>
                             </div>
                         </li>
-                        @endforeach
+                        @empty
+                        <li class="text-center text-muted">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <p>Belum ada data pengguna aktif</p>
+                        </li>
+                        @endforelse
                     </ul>
                 </div>
             </div>

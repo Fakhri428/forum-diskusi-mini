@@ -9,20 +9,47 @@ class Vote extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'thread_id', 'comment_id', 'value'];
+    protected $fillable = [
+        'user_id',
+        'votable_type',
+        'votable_id',
+        'value'
+    ];
 
+    protected $casts = [
+        'value' => 'integer',
+    ];
+
+    /**
+     * Get the user that owns the vote
+     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    public function thread()
+    /**
+     * Get the parent votable model (thread or comment)
+     */
+    public function votable()
     {
-        return $this->belongsTo(Thread::class);
+        return $this->morphTo();
     }
 
-    public function comment()
+    /**
+     * Ensure only one vote per user per item
+     */
+    public static function boot()
     {
-        return $this->belongsTo(Comment::class);
+        parent::boot();
+
+        static::creating(function ($vote) {
+            // Delete existing vote if any
+            static::where([
+                'user_id' => $vote->user_id,
+                'votable_type' => $vote->votable_type,
+                'votable_id' => $vote->votable_id
+            ])->delete();
+        });
     }
 }

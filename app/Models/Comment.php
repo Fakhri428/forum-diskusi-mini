@@ -4,12 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Comment extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
-    protected $fillable = ['body', 'user_id', 'thread_id', 'parent_id'];
+    protected $fillable = [
+        'user_id',
+        'thread_id',
+        'parent_id',
+        'body',
+        'is_approved',
+        'vote_score'
+    ];
+
+    protected $casts = [
+        'is_approved' => 'boolean',
+        'vote_score' => 'integer',
+    ];
 
     /**
      * Get the user that owns the comment.
@@ -44,7 +57,7 @@ class Comment extends Model
     }
 
     /**
-     * Get all of the votes for the comment.
+     * Get all votes for this comment
      */
     public function votes()
     {
@@ -52,10 +65,77 @@ class Comment extends Model
     }
 
     /**
-     * Calculate vote score for the comment.
+     * Get all reports for this comment
+     */
+    public function reports()
+    {
+        return $this->morphMany(Report::class, 'reportable');
+    }
+
+    /**
+     * Calculate vote score
      */
     public function voteScore()
     {
-        return $this->votes->sum('value');
+        return $this->vote_score ?? 0;
+    }
+
+    /**
+     * Check if user has voted on this comment
+     */
+    public function hasVoted($userId = null)
+    {
+        $userId = $userId ?? auth()->id();
+        return $this->votes()->where('user_id', $userId)->exists();
+    }
+
+    /**
+     * Get user's vote on this comment
+     */
+    public function getUserVote($userId = null)
+    {
+        $userId = $userId ?? auth()->id();
+        return $this->votes()->where('user_id', $userId)->first();
+    }
+
+    /**
+     * Check if comment has been reported by user
+     */
+    public function hasBeenReportedBy($userId = null)
+    {
+        $userId = $userId ?? auth()->id();
+        return $this->reports()->where('user_id', $userId)->exists();
+    }
+
+    /**
+     * Get count of reports
+     */
+    public function getReportsCount()
+    {
+        return $this->reports()->count();
+    }
+
+    /**
+     * Scope for approved comments
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
+    /**
+     * Scope for parent comments (not replies)
+     */
+    public function scopeParents($query)
+    {
+        return $query->whereNull('parent_id');
+    }
+
+    /**
+     * Scope for comments with reports
+     */
+    public function scopeReported($query)
+    {
+        return $query->has('reports');
     }
 }

@@ -223,6 +223,11 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <!-- Left Side -->
                     <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('threads.index') }}">
+                                <i class="fas fa-comments me-1"></i>Thread
+                            </a>
+                        </li>
                         @auth
                             <li class="nav-item">
                                 <span class="nav-link">
@@ -261,6 +266,18 @@
                                     <a class="dropdown-item" href="{{ route('profile') }}">
                                         <i class="fas fa-id-card me-2"></i>{{ __('Profile') }}
                                     </a>
+
+                                    @auth
+                                        @if(auth()->user()->role === 'admin')
+                                            <a class="dropdown-item" href="{{ route('admin.dashboard') }}">
+                                                <i class="fas fa-user-shield me-2"></i>Admin Dashboard
+                                            </a>
+                                        @elseif(auth()->user()->role === 'moderator')
+                                            <a class="dropdown-item" href="{{ route('moderator.dashboard') }}">
+                                                <i class="fas fa-user-cog me-2"></i>Moderator Dashboard
+                                            </a>
+                                        @endif
+                                    @endauth
 
                                     <a class="dropdown-item" href="{{ route('logout') }}"
                                         onclick="event.preventDefault();

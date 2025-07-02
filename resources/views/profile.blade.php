@@ -23,7 +23,9 @@
                     <p class="text-muted mb-1">{{ Auth::user()->role }}</p>
                     <p class="text-muted mb-4">Bergabung: {{ Auth::user()->created_at->format('d M Y') }}</p>
                     <div class="d-flex justify-content-center mb-2">
-                        <a href="#" class="btn btn-primary me-2">Edit Profil</a>
+                        <a href="{{ route('profile.edit') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-user-edit me-1"></i> Edit Profil
+                        </a>
                         <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin ingin logout?');">
                             @csrf
                             <button type="submit" class="btn btn-outline-danger">Logout</button>

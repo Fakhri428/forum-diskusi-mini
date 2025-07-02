@@ -40,6 +40,10 @@ class Kernel extends HttpKernel
 
     /**
      * The application's route middleware.
+     *
+     * These middleware may be assigned to groups or used individually.
+     *
+     * @var array<string, class-string|string>
      */
     protected $routeMiddleware = [
         'auth' => \App\Http\Middleware\Authenticate::class,
@@ -52,7 +56,12 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
-        // Tambahkan custom middleware role di sini
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'admin' => function ($request, $next) {
+            if (!auth()->check() || auth()->user()->role !== 'admin') {
+                abort(403, 'Unauthorized.');
+            }
+            return $next($request);
+        },
     ];
 }
