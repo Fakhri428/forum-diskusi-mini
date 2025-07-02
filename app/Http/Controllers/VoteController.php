@@ -148,4 +148,20 @@ class VoteController extends Controller
             return back()->with('error', 'Terjadi kesalahan saat voting. Silakan coba lagi.');
         }
     }
+
+    /**
+     * Alias method untuk voteComment (untuk backward compatibility)
+     */
+    public function comment(Request $request, Comment $comment)
+    {
+        return $this->voteComment($request, $comment);
+    }
+
+    /**
+     * Alias method untuk voteThread (untuk backward compatibility)
+     */
+    public function thread(Request $request, Thread $thread)
+    {
+        return $this->voteThread($request, $thread);
+    }
 }

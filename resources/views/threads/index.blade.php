@@ -223,6 +223,25 @@
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         margin-top: 2rem;
     }
+
+    /* New styles for voting section */
+    .vote-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .vote-score-display {
+        font-weight: 500;
+        font-size: 0.875rem;
+        color: #4a5568;
+    }
+
+    .vote-guest-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
 </style>
 @endsection
 
@@ -408,29 +427,43 @@
                     <!-- Left Side: Voting and Stats -->
                     <div class="d-flex align-items-center flex-wrap gap-2">
                         @auth
-                            <!-- Vote Buttons -->
-                            <div class="d-flex align-items-center me-3">
-                                <form action="{{ route('vote.thread', $thread) }}" method="POST" class="me-1">
+                            <!-- Vote Buttons dengan Jempol - SPACING DIPERBAIKI -->
+                            <div class="vote-wrapper">
+                                {{-- Upvote Button --}}
+                                <form action="{{ route('vote.thread', $thread) }}" method="POST" class="vote-form">
                                     @csrf
                                     <input type="hidden" name="value" value="1">
-                                    <button type="submit" class="btn btn-outline-success vote-btn" title="Upvote">
-                                        <i class="fas fa-arrow-up"></i>
+                                    <button type="submit" class="btn btn-outline-success vote-btn"
+                                            title="Suka Thread Ini"
+                                            data-bs-toggle="tooltip" data-bs-placement="top">
+                                        <i class="fas fa-thumbs-up"></i>
                                     </button>
                                 </form>
 
-                                <span class="vote-score mx-2">{{ $thread->vote_score ?? 0 }}</span>
+                                {{-- Vote Score Display --}}
+                                <div class="vote-score-display">
+                                    <span class="vote-score">{{ $thread->vote_score ?? 0 }}</span>
+                                </div>
 
-                                <form action="{{ route('vote.thread', $thread) }}" method="POST">
+                                {{-- Downvote Button --}}
+                                <form action="{{ route('vote.thread', $thread) }}" method="POST" class="vote-form">
                                     @csrf
                                     <input type="hidden" name="value" value="-1">
-                                    <button type="submit" class="btn btn-outline-danger vote-btn" title="Downvote">
-                                        <i class="fas fa-arrow-down"></i>
+                                    <button type="submit" class="btn btn-outline-danger vote-btn"
+                                            title="Tidak Suka Thread Ini"
+                                            data-bs-toggle="tooltip" data-bs-placement="top">
+                                        <i class="fas fa-thumbs-down"></i>
                                     </button>
                                 </form>
                             </div>
                         @else
-                            <div class="d-flex align-items-center me-3">
-                                <span class="vote-score">{{ $thread->vote_score ?? 0 }} votes</span>
+                            {{-- Non-authenticated user display --}}
+                            <div class="vote-wrapper guest">
+                                <div class="vote-guest-container">
+                                    <i class="fas fa-thumbs-up text-muted"></i>
+                                    <span class="vote-score guest">{{ $thread->vote_score ?? 0 }}</span>
+                                    <i class="fas fa-thumbs-down text-muted"></i>
+                                </div>
                             </div>
                         @endauth
 
@@ -438,13 +471,35 @@
                         <div class="d-flex align-items-center gap-2">
                             <span class="stats-badge">
                                 <i class="far fa-comment me-1"></i>
-                                {{ $thread->comments()->count() }} komentar
+                                {{ $thread->comments()->count() }}
+                                <span class="d-none d-sm-inline">komentar</span>
                             </span>
 
                             @if($thread->views_count > 0)
                                 <span class="stats-badge">
                                     <i class="fas fa-eye me-1"></i>
-                                    {{ $thread->views_count }} views
+                                    {{ number_format($thread->views_count) }}
+                                    <span class="d-none d-sm-inline">views</span>
+                                </span>
+                            @endif
+
+                            <!-- Thread Quality Indicator -->
+                            @php
+                                $commentCount = $thread->comments()->count();
+                                $voteScore = $thread->vote_score ?? 0;
+                                $isPopular = $commentCount >= 5 && $voteScore >= 3;
+                                $isTrending = $thread->created_at->diffInHours() <= 24 && $commentCount >= 3;
+                            @endphp
+
+                            @if($isPopular)
+                                <span class="badge bg-warning text-dark" title="Thread Populer">
+                                    <i class="fas fa-fire me-1"></i>Popular
+                                </span>
+                            @endif
+
+                            @if($isTrending)
+                                <span class="badge bg-info" title="Thread Trending">
+                                    <i class="fas fa-bolt me-1"></i>Trending
                                 </span>
                             @endif
                         </div>
@@ -452,24 +507,48 @@
 
                     <!-- Right Side: Action Buttons -->
                     <div class="d-flex align-items-center gap-2">
-                        <a href="{{ route('threads.show', $thread) }}" class="btn btn-info btn-sm action-btn">
-                            <i class="fas fa-eye me-1"></i>Lihat
+                        <a href="{{ route('threads.show', $thread) }}"
+                           class="btn btn-info btn-sm action-btn">
+                            <i class="fas fa-eye me-1"></i>
+                            <span class="d-none d-sm-inline">Lihat</span>
                         </a>
 
                         @auth
                             @if(Auth::id() == $thread->user_id)
-                                <a href="{{ route('threads.edit', $thread) }}" class="btn btn-primary btn-sm action-btn">
-                                    <i class="fas fa-edit me-1"></i>Edit
-                                </a>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ route('threads.edit', $thread) }}"
+                                       class="btn btn-primary btn-sm action-btn"
+                                       title="Edit Thread"
+                                       data-bs-toggle="tooltip">
+                                        <i class="fas fa-edit"></i>
+                                        <span class="d-none d-md-inline ms-1">Edit</span>
+                                    </a>
 
-                                <form action="{{ route('threads.destroy', $thread) }}" method="POST" class="d-inline"
-                                      onsubmit="return confirm('Yakin ingin menghapus thread ini?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm action-btn">
-                                        <i class="fas fa-trash-alt me-1"></i>Hapus
+                                    <button type="button"
+                                            class="btn btn-danger btn-sm action-btn dropdown-toggle dropdown-toggle-split"
+                                            data-bs-toggle="dropdown"
+                                            title="Opsi Lainnya">
+                                        <span class="visually-hidden">Toggle Dropdown</span>
                                     </button>
-                                </form>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <form action="{{ route('threads.destroy', $thread) }}" method="POST"
+                                                  onsubmit="return confirm('Yakin ingin menghapus thread ini? Tindakan ini tidak dapat dibatalkan.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="fas fa-trash-alt me-2"></i>Hapus Thread
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('threads.show', $thread) }}#comments">
+                                                <i class="fas fa-comments me-2"></i>Langsung ke Komentar
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             @endif
                         @endauth
                     </div>

@@ -19,15 +19,20 @@ class Category extends Model
         'name',
         'slug',
         'description',
-        'color',
+        'parent_id',
         'icon',
+        'color',
         'is_active',
-        'sort_order'
+        'position'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'sort_order' => 'integer',
+    ];
+
+    protected $attributes = [
+        'is_active' => true,
+        'color' => '#6c757d',
     ];
 
     /**
@@ -51,7 +56,25 @@ class Category extends Model
     }
 
     /**
-     * Get the threads for this category
+     * Get the parent category
+     */
+    public function parent()
+    {
+        return $this->belongsTo(Category::class, 'parent_id');
+    }
+
+    /**
+     * Get children with safety check
+     */
+    public function children()
+    {
+        return $this->hasMany(Category::class, 'parent_id')
+                    ->orderBy('position')
+                    ->orderBy('name');
+    }
+
+    /**
+     * Get threads in this category
      */
     public function threads()
     {
@@ -59,11 +82,75 @@ class Category extends Model
     }
 
     /**
-     * Get active threads count
+     * Get children safely (dengan fallback ke empty collection)
      */
-    public function getActiveThreadsCountAttribute()
+    public function getSafeChildrenAttribute()
     {
-        return $this->threads()->where('is_approved', true)->count();
+        try {
+            return $this->children ?? collect();
+        } catch (\Exception $e) {
+            \Log::warning('Error getting children for category ' . $this->id . ': ' . $e->getMessage());
+            return collect();
+        }
+    }
+
+    /**
+     * Get children count safely
+     */
+    public function getChildrenCountSafeAttribute()
+    {
+        try {
+            if ($this->children_count !== null) {
+                return $this->children_count;
+            }
+            return $this->children()->count();
+        } catch (\Exception $e) {
+            \Log::warning('Error counting children for category ' . $this->id . ': ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get threads count safely
+     */
+    public function getThreadsCountSafeAttribute()
+    {
+        try {
+            if ($this->threads_count !== null) {
+                return $this->threads_count;
+            }
+            return $this->threads()->count();
+        } catch (\Exception $e) {
+            \Log::warning('Error counting threads for category ' . $this->id . ': ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Check if category has children safely
+     */
+    public function hasChildren()
+    {
+        try {
+            return $this->children()->exists();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get full name with parent (if exists)
+     */
+    public function getFullNameAttribute()
+    {
+        try {
+            if ($this->parent) {
+                return $this->parent->name . ' > ' . $this->name;
+            }
+            return $this->name;
+        } catch (\Exception $e) {
+            return $this->name;
+        }
     }
 
     /**
@@ -75,20 +162,10 @@ class Category extends Model
     }
 
     /**
-     * Scope for ordered categories
+     * Scope for parent categories
      */
-    public function scopeOrdered($query)
+    public function scopeParents($query)
     {
-        return $query->orderBy('sort_order')->orderBy('name');
-    }
-
-    /**
-     * Scope for categories with threads count
-     */
-    public function scopeWithThreadsCount($query)
-    {
-        return $query->withCount(['threads' => function ($query) {
-            $query->where('is_approved', true);
-        }]);
+        return $query->whereNull('parent_id');
     }
 }

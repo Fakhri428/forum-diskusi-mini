@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Thread;
 use App\Models\Category;
+use App\Models\Comment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,14 @@ use Illuminate\Support\Facades\Log;
 
 class ThreadController extends Controller
 {
+    /**
+     * Scope for approved comments
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -171,20 +180,168 @@ class ThreadController extends Controller
      */
     public function show(Thread $thread)
     {
-        // Check if thread is approved or user has permission
-        if (!$thread->is_approved &&
-            (!Auth::check() ||
-             ($thread->user_id !== Auth::id() && !$this->userCanModerate()))) {
-            abort(404, 'Thread tidak ditemukan atau belum disetujui.');
+        try {
+            // Enhanced debugging
+            Log::info('=== THREAD SHOW START ===', [
+                'thread_id' => $thread->id,
+                'user_id' => Auth::id(),
+                'thread_approved' => $thread->is_approved,
+                'thread_exists' => $thread->exists
+            ]);
+
+            // Basic validations
+            if (!$thread->exists) {
+                Log::error('Thread does not exist');
+                abort(404, 'Thread tidak ditemukan.');
+            }
+
+            // Check thread approval with detailed logging
+            if (!$thread->is_approved) {
+                $canAccess = Auth::check() &&
+                            ($thread->user_id === Auth::id() || $this->userCanModerate());
+
+                Log::info('Thread approval check', [
+                    'is_approved' => $thread->is_approved,
+                    'user_authenticated' => Auth::check(),
+                    'is_owner' => Auth::check() && $thread->user_id === Auth::id(),
+                    'can_moderate' => Auth::check() && $this->userCanModerate(),
+                    'can_access' => $canAccess
+                ]);
+
+                if (!$canAccess) {
+                    abort(404, 'Thread tidak ditemukan atau belum disetujui.');
+                }
+            }
+
+            // Safe increment views count
+            try {
+                $thread->increment('views_count');
+                Log::info('Views count incremented');
+            } catch (\Exception $e) {
+                Log::warning('Failed to increment views: ' . $e->getMessage());
+            }
+
+            // Load thread relationships safely
+            try {
+                $thread->load(['user:id,name,email', 'category:id,name,slug,icon,color']);
+                Log::info('Thread relationships loaded');
+            } catch (\Exception $e) {
+                Log::warning('Failed to load thread relationships: ' . $e->getMessage());
+            }
+
+            // SIMPLIFIED comment loading to prevent errors
+            $comments = collect();
+            $totalComments = 0;
+
+            try {
+                // Load only root comments with basic relationships
+                $rootComments = Comment::with(['user:id,name,email'])
+                                    ->where('thread_id', $thread->id)
+                                    ->whereNull('parent_id')
+                                    ->where('is_approved', true)
+                                    ->orderBy('created_at', 'asc')
+                                    ->get();
+
+                Log::info('Root comments loaded', ['count' => $rootComments->count()]);
+
+                // Load children manually with better error handling
+                foreach ($rootComments as $comment) {
+                    try {
+                        $comment->depth = 0; // Set root depth
+                        $this->loadCommentsChildren($comment, 1, 3); // Max 3 levels
+                    } catch (\Exception $e) {
+                        Log::warning('Error loading children for comment ' . $comment->id . ': ' . $e->getMessage());
+                        // Continue with other comments
+                    }
+                }
+
+                $comments = $rootComments;
+
+                // Count total approved comments
+                $totalComments = Comment::where('thread_id', $thread->id)
+                                       ->where('is_approved', true)
+                                       ->count();
+
+                Log::info('Comments processing completed', [
+                    'root_comments' => $comments->count(),
+                    'total_comments' => $totalComments
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Error in comment loading: ' . $e->getMessage(), [
+                    'thread_id' => $thread->id,
+                    'stack_trace' => $e->getTraceAsString()
+                ]);
+
+                // Continue with empty collection instead of failing
+                $comments = collect();
+                $totalComments = 0;
+            }
+
+            Log::info('=== THREAD SHOW SUCCESS ===');
+
+            return view('threads.show', compact('thread', 'comments', 'totalComments'));
+
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            // Re-throw HTTP exceptions (404, 403, etc.)
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Critical error in thread show: ' . $e->getMessage(), [
+                'thread_id' => $thread->id ?? 'unknown',
+                'user_id' => Auth::id(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('threads.index')
+                           ->with('error', 'Thread tidak dapat dimuat. Silakan coba lagi.');
+        }
+    }
+
+    /**
+     * Load comment children with depth limit and error protection
+     */
+    private function loadCommentsChildren($comment, $currentDepth, $maxDepth = 3)
+    {
+        // Stop if max depth reached
+        if ($currentDepth > $maxDepth) {
+            return;
         }
 
-        // Increment views count
-        $thread->increment('views_count');
+        try {
+            // Load direct children
+            $children = Comment::with(['user:id,name,email'])
+                              ->where('parent_id', $comment->id)
+                              ->where('is_approved', true)
+                              ->orderBy('created_at', 'asc')
+                              ->get();
 
-        // Load relationships
-        $thread->load(['user', 'category', 'comments.user', 'votes']);
+            // Set depth for children and load their children
+            foreach ($children as $child) {
+                $child->depth = $currentDepth;
 
-        return view('threads.show', compact('thread'));
+                // Recursively load grandchildren
+                try {
+                    $this->loadCommentsChildren($child, $currentDepth + 1, $maxDepth);
+                } catch (\Exception $e) {
+                    Log::warning('Error loading grandchildren: ' . $e->getMessage(), [
+                        'comment_id' => $child->id,
+                        'depth' => $currentDepth + 1
+                    ]);
+                }
+            }
+
+            // Set children relationship
+            $comment->setRelation('children', $children);
+
+        } catch (\Exception $e) {
+            Log::warning('Error in loadCommentsChildren: ' . $e->getMessage(), [
+                'comment_id' => $comment->id,
+                'depth' => $currentDepth
+            ]);
+
+            // Set empty collection to prevent further errors
+            $comment->setRelation('children', collect());
+        }
     }
 
     /**
@@ -319,31 +476,7 @@ class ThreadController extends Controller
     }
 
     /**
-     * Check if current user should have auto-approved threads
-     */
-    private function shouldAutoApprove(): bool
-    {
-        if (!Auth::check()) {
-            return false;
-        }
-
-        $user = Auth::user();
-
-        // Check if user has admin/moderator methods
-        if (method_exists($user, 'isAdminOrModerator')) {
-            return $user->isAdminOrModerator();
-        }
-
-        // Fallback check by role
-        if (isset($user->role)) {
-            return in_array($user->role, ['admin', 'moderator']);
-        }
-
-        return false;
-    }
-
-    /**
-     * Check if current user can moderate
+     * Check if user can moderate threads
      */
     private function userCanModerate(): bool
     {
@@ -353,6 +486,52 @@ class ThreadController extends Controller
 
         $user = Auth::user();
 
+        // Check if user has isAdminOrModerator method
+        if (method_exists($user, 'isAdminOrModerator')) {
+            return $user->isAdminOrModerator();
+        }
+
+        // Fallback: check role column
+        if (isset($user->role)) {
+            return in_array($user->role, ['admin', 'moderator']);
+        }
+
+        // Default: false
+        return false;
+    }
+
+    /**
+     * Check if user can edit thread
+     */
+    private function userCanEdit(Thread $thread): bool
+    {
+        if (!Auth::check()) {
+            return false;
+        }
+
+        $user = Auth::user();
+
+        // Owner can edit
+        if ($thread->user_id === $user->id) {
+            return true;
+        }
+
+        // Admin/moderator can edit
+        return $this->userCanModerate();
+    }
+
+    /**
+     * Check if thread should be auto-approved
+     */
+    private function shouldAutoApprove(): bool
+    {
+        if (!Auth::check()) {
+            return false;
+        }
+
+        $user = Auth::user();
+
+        // Check if user has admin/moderator role
         if (method_exists($user, 'isAdminOrModerator')) {
             return $user->isAdminOrModerator();
         }
@@ -361,24 +540,7 @@ class ThreadController extends Controller
             return in_array($user->role, ['admin', 'moderator']);
         }
 
-        return false;
-    }
-
-    /**
-     * Check if current user can edit the thread
-     */
-    private function userCanEdit(Thread $thread): bool
-    {
-        if (!Auth::check()) {
-            return false;
-        }
-
-        // Thread owner can edit
-        if ($thread->user_id === Auth::id()) {
-            return true;
-        }
-
-        // Admin/moderator can edit
-        return $this->userCanModerate();
+        // Default: auto approve for regular users (change based on your needs)
+        return true;
     }
 }

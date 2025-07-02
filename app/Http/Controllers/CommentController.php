@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\DB;
 
 class CommentController extends Controller
 {
+    // Max nesting depth untuk mencegah nesting yang terlalu dalam
+    const MAX_DEPTH = 5;
+
     /**
      * Apply middleware to protect routes
      */
@@ -20,21 +23,18 @@ class CommentController extends Controller
     }
 
     /**
-     * Store a newly created comment
+     * Store a newly created comment or reply
      */
     public function store(Request $request, Thread $thread)
     {
+        // Debug logging
+        \Log::info('Comment store method called', [
+            'user_id' => Auth::id(),
+            'thread_id' => $thread->id,
+            'request_data' => $request->all()
+        ]);
+
         try {
-            // Check if thread exists and is not soft deleted
-            if (!$thread || $thread->trashed()) {
-                return back()->with('error', 'Thread tidak ditemukan atau sudah dihapus.');
-            }
-
-            // Check if thread is locked
-            if ($thread->is_locked) {
-                return back()->with('error', 'Thread ini sudah dikunci dan tidak bisa dikomentari.');
-            }
-
             // Validate request
             $validated = $request->validate([
                 'body' => 'required|string|min:5|max:1000',
@@ -46,50 +46,82 @@ class CommentController extends Controller
                 'parent_id.exists' => 'Komentar yang direply tidak valid.'
             ]);
 
-            // Check if parent comment belongs to same thread
+            \Log::info('Validation passed', $validated);
+
+            $depth = 0;
+            $parentComment = null;
+
+            // Handle reply logic
             if (!empty($validated['parent_id'])) {
-                $parentComment = Comment::find($validated['parent_id']);
+                $parentComment = Comment::with('thread')->find($validated['parent_id']);
+
                 if (!$parentComment || $parentComment->thread_id !== $thread->id) {
+                    \Log::warning('Invalid parent comment', [
+                        'parent_id' => $validated['parent_id'],
+                        'thread_id' => $thread->id
+                    ]);
                     return back()->with('error', 'Komentar yang direply tidak valid.');
+                }
+
+                // Calculate depth
+                $depth = $parentComment->calculateDepth() + 1;
+
+                // Check max depth limit
+                if ($depth > self::MAX_DEPTH) {
+                    \Log::warning('Max depth exceeded', ['depth' => $depth]);
+                    return back()->with('error', 'Tingkat balasan sudah mencapai maksimum. Silakan balas komentar di level atas.');
+                }
+
+                // Check if parent comment is approved
+                if (!$parentComment->is_approved) {
+                    \Log::warning('Parent comment not approved');
+                    return back()->with('error', 'Tidak dapat membalas komentar yang belum disetujui.');
                 }
             }
 
             DB::beginTransaction();
 
-            // Create comment
+            // Create comment/reply
             $comment = Comment::create([
-                'body' => $validated['body'],
+                'body' => trim($validated['body']),
                 'thread_id' => $thread->id,
                 'user_id' => Auth::id(),
                 'parent_id' => $validated['parent_id'] ?? null,
+                'depth' => $depth,
                 'is_approved' => $this->shouldAutoApprove(),
                 'vote_score' => 0
             ]);
 
+            \Log::info('Comment created successfully', [
+                'comment_id' => $comment->id,
+                'depth' => $depth
+            ]);
+
             DB::commit();
 
+            // Success message
             $message = $comment->is_approved
-                ? 'Komentar berhasil ditambahkan!'
-                : 'Komentar berhasil ditambahkan dan menunggu persetujuan moderator.';
+                ? ($depth > 0 ? 'Balasan berhasil ditambahkan!' : 'Komentar berhasil ditambahkan!')
+                : ($depth > 0 ? 'Balasan berhasil ditambahkan dan menunggu persetujuan moderator.' : 'Komentar berhasil ditambahkan dan menunggu persetujuan moderator.');
 
-            // Redirect with success message
-            return redirect()->route('threads.show', $thread->id)
+            return redirect()->route('threads.show', $thread)
                            ->with('success', $message)
                            ->withFragment('comment-' . $comment->id);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Validation failed', ['errors' => $e->errors()]);
             return back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
             DB::rollBack();
 
-            Log::error('Error creating comment: ' . $e->getMessage(), [
+            \Log::error('Error creating comment/reply: ' . $e->getMessage(), [
                 'user_id' => Auth::id(),
-                'thread_id' => $thread->id ?? 'unknown',
-                'request_data' => $request->all(),
+                'thread_id' => $thread->id,
+                'parent_id' => $request->input('parent_id'),
                 'stack_trace' => $e->getTraceAsString()
             ]);
 
-            return back()->with('error', 'Terjadi kesalahan saat menambahkan komentar: ' . $e->getMessage())->withInput();
+            return back()->with('error', 'Terjadi kesalahan saat menambahkan ' . ($request->input('parent_id') ? 'balasan' : 'komentar') . ': ' . $e->getMessage())->withInput();
         }
     }
 
@@ -98,12 +130,21 @@ class CommentController extends Controller
      */
     public function edit(Comment $comment)
     {
-        // Check authorization
-        if (!$this->userCanEdit($comment)) {
-            abort(403, 'Anda tidak memiliki izin untuk mengedit komentar ini.');
-        }
+        try {
+            // Check authorization
+            if (!$this->userCanEdit($comment)) {
+                abort(403, 'Anda tidak memiliki izin untuk mengedit komentar ini.');
+            }
 
-        return view('comments.edit', compact('comment'));
+            // Load relationships
+            $comment->load(['user', 'thread', 'parent.user']);
+
+            return view('comments.edit', compact('comment'));
+
+        } catch (\Exception $e) {
+            Log::error('Error loading comment edit form: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat memuat form edit.');
+        }
     }
 
     /**
@@ -183,7 +224,7 @@ class CommentController extends Controller
             return in_array($user->role, ['admin', 'moderator']);
         }
 
-        // Default: auto approve for regular users
+        // Default: auto approve for regular users (adjust as needed)
         return true;
     }
 
@@ -214,4 +255,28 @@ class CommentController extends Controller
 
         return false;
     }
+
+    /**
+     * Set depth recursively for comments
+     */
+    private function setDepthRecursively($comment, $depth)
+    {
+        try {
+            // Set depth untuk comment saat ini
+            $comment->depth = $depth;
+
+            // Jika ada children, set depth untuk setiap child
+            if ($comment->relationLoaded('children') && $comment->children && $comment->children->count() > 0) {
+                $comment->children->each(function ($child) use ($depth) {
+                    $this->setDepthRecursively($child, $depth + 1);
+                });
+            }
+        } catch (\Exception $e) {
+            Log::warning('Error setting depth for comment: ' . $e->getMessage(), [
+                'comment_id' => $comment->id ?? 'unknown',
+                'depth' => $depth
+            ]);
+        }
+    }
+
 }

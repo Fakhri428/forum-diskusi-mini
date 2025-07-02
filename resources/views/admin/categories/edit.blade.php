@@ -27,6 +27,31 @@
         </a>
     </div>
 
+    {{-- Notifikasi --}}
+    @if(session('warning'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            {{ session('warning') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <!-- Form Card -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
@@ -50,22 +75,43 @@
                         <label for="parent_id" class="form-label">Induk Kategori</label>
                         <select class="form-select @error('parent_id') is-invalid @enderror" id="parent_id" name="parent_id">
                             <option value="">Tidak Ada (Kategori Utama)</option>
-                            @foreach($allCategories as $parentCategory)
-                                <option value="{{ $parentCategory->id }}" {{ old('parent_id', $category->parent_id) == $parentCategory->id ? 'selected' : '' }}>
-                                    {{ $parentCategory->name }}
-                                </option>
-                                @foreach($parentCategory->children as $child)
-                                    @if($child->id != $category->id) {{-- Exclude self --}}
-                                        <option value="{{ $child->id }}" {{ old('parent_id', $category->parent_id) == $child->id ? 'selected' : '' }}>
-                                            &nbsp;&nbsp;&nbsp;└ {{ $child->name }}
-                                        </option>
+
+                            {{-- Safety check untuk $allCategories --}}
+                            @if(isset($allCategories) && $allCategories->count() > 0)
+                                @foreach($allCategories as $parentCategory)
+                                    <option value="{{ $parentCategory->id }}"
+                                            {{ (old('parent_id', $category->parent_id) == $parentCategory->id) ? 'selected' : '' }}>
+                                        {{ $parentCategory->name }}
+                                    </option>
+
+                                    {{-- Safety check untuk children --}}
+                                    @if(isset($parentCategory->children) && $parentCategory->children->count() > 0)
+                                        @foreach($parentCategory->children as $child)
+                                            {{-- Skip current category untuk prevent circular reference --}}
+                                            @if($child->id !== $category->id)
+                                                <option value="{{ $child->id }}"
+                                                        {{ (old('parent_id', $category->parent_id) == $child->id) ? 'selected' : '' }}>
+                                                    &nbsp;&nbsp;&nbsp;└ {{ $child->name }}
+                                                </option>
+                                            @endif
+                                        @endforeach
                                     @endif
                                 @endforeach
-                            @endforeach
+                            @else
+                                <option value="" disabled>Tidak ada kategori parent yang tersedia</option>
+                            @endif
                         </select>
+
                         @error('parent_id')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+
+                        <small class="form-text text-muted">
+                            Kategori tidak dapat menjadi parent dari dirinya sendiri atau descendantnya.
+                            @if(!isset($allCategories) || $allCategories->count() === 0)
+                                <br><span class="text-warning">Tidak ada kategori parent yang tersedia.</span>
+                            @endif
+                        </small>
                     </div>
                 </div>
 
@@ -143,7 +189,7 @@
                         </tr>
                         <tr>
                             <th>Slug</th>
-                            <td>{{ $category->slug }}</td>
+                            <td><code>{{ $category->slug }}</code></td>
                         </tr>
                         <tr>
                             <th>Dibuat Pada</th>
@@ -159,15 +205,22 @@
                     <table class="table table-borderless">
                         <tr>
                             <th>Jumlah Thread</th>
-                            <td>{{ $category->threads_count }}</td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {{ $category->threads_count_safe }}
+                            </td>
                         </tr>
                         <tr>
                             <th>Status</th>
                             <td>
                                 @if($category->is_active)
-                                    <span class="badge bg-success">Aktif</span>
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Aktif
+                                    </span>
                                 @else
-                                    <span class="badge bg-danger">Nonaktif</span>
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Nonaktif
+                                    </span>
                                 @endif
                             </td>
                         </tr>
@@ -177,9 +230,44 @@
                         </tr>
                         <tr>
                             <th>Sub-kategori</th>
-                            <td>{{ $category->children->count() }}</td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    {{ $category->children_count_safe }}
+                                </span>
+                                @if($category->hasChildren())
+                                    <button type="button" class="btn btn-sm btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#childrenModal">
+                                        <i class="fas fa-eye"></i> Lihat
+                                    </button>
+                                @endif
+                            </td>
                         </tr>
+                        @if($category->parent)
+                            <tr>
+                                <th>Parent Kategori</th>
+                                <td>
+                                    <a href="{{ route('admin.categories.edit', $category->parent) }}" class="text-decoration-none">
+                                        {{ $category->parent->name }}
+                                    </a>
+                                </td>
+                            </tr>
+                        @endif
                     </table>
+                </div>
+            </div>
+
+            {{-- Preview kategori --}}
+            <div class="mt-3 pt-3 border-top">
+                <h6>Preview Kategori:</h6>
+                <div class="d-flex align-items-center">
+                    @if($category->icon)
+                        <i class="{{ $category->icon }}" style="color: {{ $category->color }}; font-size: 1.5rem;"></i>
+                    @endif
+                    <div class="ms-3">
+                        <h6 class="mb-1" style="color: {{ $category->color }};">{{ $category->name }}</h6>
+                        @if($category->description)
+                            <small class="text-muted">{{ $category->description }}</small>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -225,3 +313,42 @@
     });
 </script>
 @endsection
+
+{{-- Modal untuk melihat children --}}
+@if($category->hasChildren())
+<div class="modal fade" id="childrenModal" tabindex="-1" aria-labelledby="childrenModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="childrenModalLabel">Sub-kategori dari "{{ $category->name }}"</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    @foreach($category->safe_children as $child)
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                @if($child->icon)
+                                    <i class="{{ $child->icon }}" style="color: {{ $child->color }};"></i>
+                                @endif
+                                <div class="ms-2">
+                                    <h6 class="mb-0">{{ $child->name }}</h6>
+                                    @if($child->description)
+                                        <small class="text-muted">{{ Str::limit($child->description, 50) }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge bg-info">{{ $child->threads_count_safe }} threads</span>
+                                <a href="{{ route('admin.categories.edit', $child) }}" class="btn btn-sm btn-outline-primary ms-2">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif

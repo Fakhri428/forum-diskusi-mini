@@ -370,6 +370,48 @@
     </script>
 
     @stack('scripts')
+
+    {{-- Tambahkan di resources/views/layouts/app.blade.php atau sejenisnya, sebelum closing body --}}
+@if(app()->environment('local'))
+<script>
+// Debug helper
+setTimeout(function() {
+    console.log('=== PAGE DEBUG ===');
+    console.log('jQuery loaded:', typeof $ !== 'undefined');
+    console.log('Bootstrap loaded:', typeof bootstrap !== 'undefined');
+    console.log('Reply buttons:', document.querySelectorAll('.reply-btn').length);
+    console.log('Reply forms:', document.querySelectorAll('.reply-form').length);
+
+    // Test button clickability
+    document.querySelectorAll('.reply-btn').forEach((btn, i) => {
+        const rect = btn.getBoundingClientRect();
+        const elementAtCenter = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+        );
+
+        if (elementAtCenter !== btn) {
+            console.warn(`Reply button ${i} might be blocked by:`, elementAtCenter);
+        }
+    });
+}, 1000);
+
+// Test function untuk tombol reply
+window.testReply = function(commentId) {
+    console.log('Testing reply for comment:', commentId);
+    const button = document.querySelector(`[data-comment-id="${commentId}"]`);
+    const form = document.getElementById(`reply-form-${commentId}`);
+
+    console.log('Button found:', !!button);
+    console.log('Form found:', !!form);
+
+    if (button && form) {
+        form.classList.remove('d-none');
+        console.log('Form shown successfully');
+    }
+};
+</script>
+@endif
 </body>
 
 </html>

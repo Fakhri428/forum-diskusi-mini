@@ -1,4 +1,5 @@
-<!-- filepath: /home/helixstars/LAMPP/www/disquseria/resources/views/admin/comments/index.blade.php -->
+{{-- filepath: resources/views/admin/comments/index.blade.php --}}
+
 @extends('layouts.admin')
 
 @section('title', 'Kelola Komentar')
@@ -28,9 +29,31 @@
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-gray-800">Kelola Komentar</h1>
-        <a href="{{ route('admin.comments.create') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle me-1"></i> Tambah Komentar
-        </a>
+
+        {{-- PERBAIKAN: Dropdown untuk pilihan navigasi --}}
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-plus-circle me-1"></i> Tambah Komentar
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="{{ route('threads.index') }}">
+                        <i class="fas fa-comment me-1"></i> Lihat Threads (Dashboard)
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{{ route('threads.index') }}" target="_blank">
+                        <i class="fas fa-external-link-alt me-1"></i> Buka Tab Baru
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{{ route('admin.threads.index') }}">
+                        <i class="fas fa-cogs me-1"></i> Kelola Threads
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <!-- Filter & Search -->
@@ -131,7 +154,7 @@
                                 <th>Penulis</th>
                                 <th>Tanggal</th>
                                 <th>Status</th>
-                                <th width="150px">Aksi</th>
+                                <th width="200px">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -146,11 +169,45 @@
                                         <div class="comment-body">
                                             {{ $comment->body }}
                                         </div>
+                                        {{-- Preview tooltip --}}
+                                        @if(strlen($comment->body) > 100)
+                                            <small class="text-muted d-block mt-1">
+                                                <i class="fas fa-info-circle me-1"></i>Klik untuk lihat lengkap
+                                            </small>
+                                        @endif
                                     </td>
                                     <td>
-                                        <a href="{{ route('admin.threads.show', $comment->thread->id) }}" class="text-decoration-none">
-                                            {{ Str::limit($comment->thread->title, 30) }}
-                                        </a>
+                                        {{-- PERBAIKAN: Dropdown untuk pilihan view thread --}}
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-grow-1">
+                                                <a href="{{ route('threads.show', $comment->thread) }}" class="text-decoration-none">
+                                                    {{ Str::limit($comment->thread->title, 30) }}
+                                                </a>
+                                            </div>
+                                            <div class="dropdown ms-2">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                                        type="button" data-bs-toggle="dropdown">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('threads.show', $comment->thread) }}">
+                                                            <i class="fas fa-eye me-1"></i> Lihat di Dashboard
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('threads.show', $comment->thread) }}" target="_blank">
+                                                            <i class="fas fa-external-link-alt me-1"></i> Buka Tab Baru
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('threads.show', $comment->thread) }}#comment-{{ $comment->id }}">
+                                                            <i class="fas fa-anchor me-1"></i> Langsung ke Komentar
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <a href="{{ route('admin.users.show', $comment->user->id) }}" class="text-decoration-none">
@@ -159,6 +216,8 @@
                                     </td>
                                     <td>
                                         <small>{{ $comment->created_at->format('d M Y H:i') }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ $comment->created_at->diffForHumans() }}</small>
                                     </td>
                                     <td>
                                         @if($comment->is_approved)
@@ -172,24 +231,122 @@
                                                 <i class="fas fa-flag"></i> {{ $comment->reports_count }}
                                             </span>
                                         @endif
+
+                                        {{-- Reply indicator --}}
+                                        @if($comment->parent_id)
+                                            <span class="badge bg-info" title="Balasan">
+                                                <i class="fas fa-reply"></i>
+                                            </span>
+                                        @endif
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <a href="{{ route('admin.comments.show', $comment->id) }}" class="btn btn-info" title="Detail">
+                                            {{-- Quick View Button --}}
+                                            <button type="button" class="btn btn-info quick-view-btn"
+                                                    data-bs-toggle="modal" data-bs-target="#commentModal"
+                                                    data-comment-id="{{ $comment->id }}"
+                                                    data-comment-body="{{ $comment->body }}"
+                                                    data-comment-user="{{ $comment->user->name }}"
+                                                    data-comment-date="{{ $comment->created_at->format('d M Y H:i') }}"
+                                                    data-thread-title="{{ $comment->thread->title }}"
+                                                    title="Quick View">
                                                 <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="{{ route('admin.comments.edit', $comment->id) }}" class="btn btn-primary" title="Edit">
+                                            </button>
+
+                                            {{-- PERBAIKAN: Edit tanpa target="_blank" sebagai default --}}
+                                            <a href="{{ route('comments.edit', $comment) }}"
+                                               class="btn btn-primary" title="Edit Comment">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <button type="button" class="btn btn-{{ $comment->is_approved ? 'warning' : 'success' }} btn-approval"
-                                                data-id="{{ $comment->id }}"
-                                                data-status="{{ $comment->is_approved ? 1 : 0 }}"
-                                                title="{{ $comment->is_approved ? 'Batalkan Persetujuan' : 'Setujui' }}">
-                                                <i class="fas fa-{{ $comment->is_approved ? 'times' : 'check' }}"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-danger btn-delete" data-id="{{ $comment->id }}" title="Hapus">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+
+                                            {{-- Quick Actions dengan Dropdown --}}
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-secondary dropdown-toggle"
+                                                        data-bs-toggle="dropdown" title="Actions">
+                                                    <i class="fas fa-cog"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    {{-- View Options --}}
+                                                    <li>
+                                                        <h6 class="dropdown-header">Lihat Komentar</h6>
+                                                    </li>
+                                                    <li>
+                                                        <a href="{{ route('threads.show', $comment->thread) }}#comment-{{ $comment->id }}"
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-anchor text-info"></i> Lihat di Thread
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a href="{{ route('threads.show', $comment->thread) }}#comment-{{ $comment->id }}"
+                                                           class="dropdown-item" target="_blank">
+                                                            <i class="fas fa-external-link-alt text-primary"></i> Buka Tab Baru
+                                                        </a>
+                                                    </li>
+
+                                                    {{-- Edit Options --}}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <h6 class="dropdown-header">Edit Komentar</h6>
+                                                    </li>
+                                                    <li>
+                                                        <a href="{{ route('comments.edit', $comment) }}"
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-edit text-warning"></i> Edit di Dashboard
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a href="{{ route('comments.edit', $comment) }}"
+                                                           class="dropdown-item" target="_blank">
+                                                            <i class="fas fa-external-link-alt text-warning"></i> Edit Tab Baru
+                                                        </a>
+                                                    </li>
+
+                                                    {{-- Admin Actions --}}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <h6 class="dropdown-header">Admin Actions</h6>
+                                                    </li>
+
+                                                    {{-- Toggle Approval --}}
+                                                    <li>
+                                                        <button type="button" class="dropdown-item btn-approval"
+                                                                data-id="{{ $comment->id }}"
+                                                                data-status="{{ $comment->is_approved ? 1 : 0 }}">
+                                                            @if($comment->is_approved)
+                                                                <i class="fas fa-times-circle text-warning"></i> Batalkan Persetujuan
+                                                            @else
+                                                                <i class="fas fa-check-circle text-success"></i> Setujui
+                                                            @endif
+                                                        </button>
+                                                    </li>
+
+                                                    {{-- View User Profile --}}
+                                                    <li>
+                                                        <a href="{{ route('admin.users.show', $comment->user->id) }}"
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-user text-primary"></i> Lihat Profil User
+                                                        </a>
+                                                    </li>
+
+                                                    {{-- View Thread in Admin --}}
+                                                    <li>
+                                                        <a href="{{ route('admin.threads.show', $comment->thread->id) }}"
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-cogs text-info"></i> Kelola Thread
+                                                        </a>
+                                                    </li>
+
+                                                    <li><hr class="dropdown-divider"></li>
+
+                                                    {{-- Delete --}}
+                                                    <li>
+                                                        <button type="button" class="dropdown-item text-danger btn-delete"
+                                                                data-id="{{ $comment->id }}">
+                                                            <i class="fas fa-trash"></i> Hapus Comment
+                                                        </button>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -203,14 +360,79 @@
                 </div>
             @else
                 <div class="text-center py-5">
-                    <img src="{{ asset('images/empty-comments.svg') }}" alt="Tidak ada komentar" class="img-fluid mb-3" style="max-width: 200px;">
+                    <div class="mb-3">
+                        <i class="fas fa-comments fa-4x text-muted"></i>
+                    </div>
                     <h5>Tidak ada komentar yang ditemukan</h5>
-                    <p class="text-muted">Mulai dengan membuat komentar baru atau ubah filter Anda.</p>
-                    <a href="{{ route('admin.comments.create') }}" class="btn btn-primary">
-                        <i class="fas fa-plus-circle me-1"></i> Tambah Komentar
-                    </a>
+                    <p class="text-muted">Komentar akan muncul di sini ketika user menambahkan komentar ke threads.</p>
+
+                    {{-- PERBAIKAN: Dropdown untuk opsi navigasi --}}
+                    <div class="dropdown">
+                        <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-external-link-alt me-1"></i> Lihat Threads
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ route('threads.index') }}">
+                                    <i class="fas fa-list me-1"></i> Lihat di Dashboard
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('threads.index') }}" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i> Buka Tab Baru
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('admin.threads.index') }}">
+                                    <i class="fas fa-cogs me-1"></i> Kelola Threads
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             @endif
+        </div>
+    </div>
+</div>
+
+<!-- Quick View Comment Modal -->
+<div class="modal fade" id="commentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detail Komentar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Thread:</h6>
+                    <p id="modal-thread-title" class="text-muted"></p>
+                </div>
+                <div class="mb-3">
+                    <h6>Penulis:</h6>
+                    <p id="modal-comment-user"></p>
+                </div>
+                <div class="mb-3">
+                    <h6>Tanggal:</h6>
+                    <p id="modal-comment-date" class="text-muted"></p>
+                </div>
+                <div class="mb-3">
+                    <h6>Komentar:</h6>
+                    <div id="modal-comment-body" class="bg-light p-3 rounded" style="white-space: pre-wrap;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <div class="btn-group">
+                    <a href="#" id="modal-view-thread" class="btn btn-info">
+                        <i class="fas fa-eye me-1"></i> Lihat Thread
+                    </a>
+                    <a href="#" id="modal-edit-comment" class="btn btn-primary">
+                        <i class="fas fa-edit me-1"></i> Edit
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -316,6 +538,34 @@
             const anyChecked = Array.from(commentCheckboxes).some(checkbox => checkbox.checked);
             bulkActions.style.display = anyChecked ? 'flex' : 'none';
         }
+
+        // Quick View Modal
+        const commentModal = new bootstrap.Modal(document.getElementById('commentModal'));
+
+        document.querySelectorAll('.quick-view-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const commentId = this.getAttribute('data-comment-id');
+                const commentBody = this.getAttribute('data-comment-body');
+                const commentUser = this.getAttribute('data-comment-user');
+                const commentDate = this.getAttribute('data-comment-date');
+                const threadTitle = this.getAttribute('data-thread-title');
+
+                // Update modal content
+                document.getElementById('modal-comment-body').textContent = commentBody;
+                document.getElementById('modal-comment-user').textContent = commentUser;
+                document.getElementById('modal-comment-date').textContent = commentDate;
+                document.getElementById('modal-thread-title').textContent = threadTitle;
+
+                // Update modal action buttons
+                const viewThreadBtn = document.getElementById('modal-view-thread');
+                const editCommentBtn = document.getElementById('modal-edit-comment');
+
+                // These hrefs should be set based on the comment data
+                // You might need to add data attributes for thread-id and comment-id
+                viewThreadBtn.href = `{{ url('threads') }}/${this.getAttribute('data-thread-id')}#comment-${commentId}`;
+                editCommentBtn.href = `{{ url('comments') }}/${commentId}/edit`;
+            });
+        });
 
         // Bulk Actions
         const bulkActionModal = new bootstrap.Modal(document.getElementById('bulkActionModal'));

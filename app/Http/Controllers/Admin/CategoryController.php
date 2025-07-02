@@ -38,10 +38,29 @@ class CategoryController extends Controller
      */
     public function create()
     {
-        // Get all categories for parent selection
-        $allCategories = Category::whereNull('parent_id')->get();
+        try {
+            // Get all categories untuk parent selection dengan error handling
+            $allCategories = Category::with('children')
+                                   ->whereNull('parent_id') // Hanya parent categories
+                                   ->orderBy('name')
+                                   ->get();
 
-        return view('admin.categories.create', compact('allCategories'));
+            // Jika collection kosong, buat empty collection
+            if ($allCategories->isEmpty()) {
+                $allCategories = collect();
+            }
+
+            return view('admin.categories.create', compact('allCategories'));
+
+        } catch (\Exception $e) {
+            // Log error dan buat empty collection sebagai fallback
+            \Log::error('Error loading categories for create form: ' . $e->getMessage());
+
+            $allCategories = collect();
+
+            return view('admin.categories.create', compact('allCategories'))
+                   ->with('warning', 'Ada masalah saat memuat kategori parent. Form tetap dapat digunakan.');
+        }
     }
 
     /**
@@ -90,12 +109,47 @@ class CategoryController extends Controller
      */
     public function edit(Category $category)
     {
-        // Get all categories for parent selection, excluding this one
-        $allCategories = Category::where('id', '!=', $category->id)
-                                ->whereNull('parent_id')
-                                ->get();
+        try {
+            // Load category dengan relasi dan counts yang diperlukan
+            $category->load(['children', 'parent']);
+            $category->loadCount(['threads', 'children']);
 
-        return view('admin.categories.edit', compact('category', 'allCategories'));
+            // Get all categories except current category untuk parent selection
+            $allCategories = Category::with(['children' => function($query) use ($category) {
+                                    // Exclude current category from children list
+                                    $query->where('id', '!=', $category->id);
+                                }])
+                               ->whereNull('parent_id') // Only parent categories
+                               ->where('id', '!=', $category->id) // Exclude current category
+                               ->orderBy('name')
+                               ->get();
+
+            // Filter out any descendants to prevent circular reference
+            $allCategories = $allCategories->filter(function ($cat) use ($category) {
+                return !$this->isDescendantOf($cat, $category);
+            });
+
+            // Ensure we have a collection even if empty
+            if (!$allCategories) {
+                $allCategories = collect();
+            }
+
+            return view('admin.categories.edit', compact('category', 'allCategories'));
+
+        } catch (\Exception $e) {
+            \Log::error('Error loading category for edit: ' . $e->getMessage());
+
+            // Fallback dengan empty collection
+            $allCategories = collect();
+
+            // Ensure category has default values
+            if (!$category->children) {
+                $category->setRelation('children', collect());
+            }
+
+            return view('admin.categories.edit', compact('category', 'allCategories'))
+                   ->with('warning', 'Ada masalah saat memuat data kategori. Form tetap dapat digunakan.');
+        }
     }
 
     /**
@@ -149,14 +203,23 @@ class CategoryController extends Controller
      */
     public function toggleActive(Category $category)
     {
-        $category->update([
-            'is_active' => !$category->is_active
-        ]);
+        try {
+            // Toggle the is_active status
+            $category->update([
+                'is_active' => !$category->is_active
+            ]);
 
-        $status = $category->is_active ? 'diaktifkan' : 'dinonaktifkan';
+            $status = $category->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
-        return redirect()->route('admin.categories.index')
-                         ->with('success', "Kategori berhasil {$status}!");
+            return redirect()->route('admin.categories.index')
+                             ->with('success', "Kategori '{$category->name}' berhasil {$status}!");
+
+        } catch (\Exception $e) {
+            \Log::error('Error toggling category status: ' . $e->getMessage());
+
+            return redirect()->route('admin.categories.index')
+                             ->with('error', 'Terjadi kesalahan saat mengubah status kategori.');
+        }
     }
 
     /**
@@ -164,18 +227,44 @@ class CategoryController extends Controller
      */
     public function reorder(Request $request)
     {
-        $validated = $request->validate([
-            'categories' => ['required', 'array'],
-            'categories.*.id' => ['required', 'exists:categories,id'],
-            'categories.*.position' => ['required', 'integer', 'min:0'],
-        ]);
-
-        foreach ($validated['categories'] as $item) {
-            Category::where('id', $item['id'])->update([
-                'position' => $item['position']
+        try {
+            $validated = $request->validate([
+                'categories' => ['required', 'array'],
+                'categories.*.id' => ['required', 'exists:categories,id'],
+                'categories.*.position' => ['required', 'integer', 'min:0'],
             ]);
+
+            foreach ($validated['categories'] as $item) {
+                Category::where('id', $item['id'])->update([
+                    'position' => $item['position']
+                ]);
+            }
+
+            return response()->json(['success' => true]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error reordering categories: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menyimpan urutan'
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to check if category is descendant of another
+     */
+    private function isDescendantOf($category, $ancestor)
+    {
+        if ($category->parent_id === $ancestor->id) {
+            return true;
         }
 
-        return response()->json(['success' => true]);
+        if ($category->parent) {
+            return $this->isDescendantOf($category->parent, $ancestor);
+        }
+
+        return false;
     }
 }

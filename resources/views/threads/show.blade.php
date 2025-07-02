@@ -505,17 +505,31 @@
 
             @if($thread->comments->where('parent_id', null)->count() > 0)
                 <div class="comments-container">
+                    {{-- TAMBAHKAN INI - Set level awal ke 0 --}}
                     @include('threads.partials.comments', [
-                        'comments' => $thread->comments()->whereNull('parent_id')->with('user', 'votes', 'children.user', 'children.votes')->latest()->get()
+                        'comments' => $thread->comments()->whereNull('parent_id')->with('user', 'votes', 'children.user', 'children.votes')->latest()->get(),
+                        'level' => 0
                     ])
                 </div>
             @else
-                <div class="empty-comments">
-                    <div class="empty-icon">
-                        <i class="far fa-comments"></i>
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="fas fa-comments fa-4x text-muted"></i>
                     </div>
-                    <h5>Belum ada komentar dalam diskusi ini</h5>
-                    <p class="text-muted">Jadilah yang pertama untuk berkomentar dan mulai diskusi!</p>
+                    <h5 class="text-muted">Belum ada komentar</h5>
+                    <p class="text-muted">Jadilah yang pertama berkomentar!</p>
+
+                    @auth
+                        @if(!$thread->is_locked)
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('comment-form').scrollIntoView({behavior: 'smooth'})">
+                                <i class="fas fa-comment me-1"></i>Tulis Komentar
+                            </button>
+                        @endif
+                    @else
+                        <a href="{{ route('login') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-sign-in-alt me-1"></i>Login untuk Berkomentar
+                        </a>
+                    @endauth
                 </div>
             @endif
 

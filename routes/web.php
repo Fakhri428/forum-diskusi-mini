@@ -51,13 +51,15 @@ Route::middleware('auth')->group(function () {
 
     // Comment management
     Route::post('/threads/{thread}/comments', [CommentController::class, 'store'])->name('comments.store');
+
+    // Comment routes
     Route::get('/comments/{comment}/edit', [CommentController::class, 'edit'])->name('comments.edit');
     Route::put('/comments/{comment}', [CommentController::class, 'update'])->name('comments.update');
     Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
 
-    // Vote routes
-    Route::post('/threads/{thread}/vote', [VoteController::class, 'voteThread'])->name('vote.thread');
+    // Vote routes - PERBAIKIAN DI SINI
     Route::post('/comments/{comment}/vote', [VoteController::class, 'voteComment'])->name('vote.comment');
+    Route::post('/threads/{thread}/vote', [VoteController::class, 'voteThread'])->name('vote.thread');
 
     // User personal pages
     Route::get('/diskusi-saya', function() {
@@ -117,6 +119,10 @@ Route::middleware(['auth', \App\Http\Middleware\RoleMiddleware::class . ':admin'
         Route::resource('categories', CategoryController::class);
         Route::post('categories/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
 
+        // TAMBAHKAN route ini SETELAH resource routes
+        Route::put('categories/{category}/toggle-active', [App\Http\Controllers\Admin\CategoryController::class, 'toggleActive'])
+             ->name('categories.toggle-active');
+
         // Thread management
         Route::resource('threads', AdminThreadController::class);
         Route::post('threads/batch-action', [AdminThreadController::class, 'batchAction'])->name('threads.batch-action');
@@ -160,6 +166,29 @@ Route::middleware(['auth', \App\Http\Middleware\RoleMiddleware::class . ':modera
         Route::put('profile', [App\Http\Controllers\Moderator\ProfileController::class, 'update'])->name('profile.update');
         Route::put('profile/password', [App\Http\Controllers\Moderator\ProfileController::class, 'updatePassword'])->name('profile.password');
     });
+
+// Pastikan route ini ada di dalam middleware auth
+Route::middleware(['auth'])->group(function () {
+    // Comment routes - PASTIKAN ROUTE INI ADA
+    Route::post('threads/{thread}/comments', [App\Http\Controllers\CommentController::class, 'store'])
+         ->name('comments.store');
+
+    Route::get('comments/{comment}/edit', [App\Http\Controllers\CommentController::class, 'edit'])
+         ->name('comments.edit');
+
+    Route::put('comments/{comment}', [App\Http\Controllers\CommentController::class, 'update'])
+         ->name('comments.update');
+
+    Route::delete('comments/{comment}', [App\Http\Controllers\CommentController::class, 'destroy'])
+         ->name('comments.destroy');
+
+    // Vote routes
+    Route::post('vote/thread/{thread}', [App\Http\Controllers\VoteController::class, 'voteThread'])
+         ->name('vote.thread');
+
+    Route::post('vote/comment/{comment}', [App\Http\Controllers\VoteController::class, 'voteComment'])
+         ->name('vote.comment');
+});
 
 
 
