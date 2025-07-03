@@ -82,29 +82,15 @@
                         </div>
 
                         <div class="col-md-6 mb-3">
-                            <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">@</span>
-                                <input type="text" class="form-control @error('username') is-invalid @enderror" id="username" name="username" value="{{ old('username') }}" required>
-                                @error('username')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                            <small class="form-text text-muted">
-                                Username harus unik, min. 3 karakter, hanya boleh mengandung huruf, angka, dan underscore.
-                            </small>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
                             <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
                             <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" required>
                             @error('email')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                    </div>
 
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
                             <div class="input-group">
@@ -120,27 +106,25 @@
                                 Password minimal 8 karakter dan harus mengandung huruf dan angka.
                             </small>
                         </div>
-                    </div>
 
-                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="password_confirmation" class="form-label">Konfirmasi Password <span class="text-danger">*</span></label>
                             <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required>
                         </div>
+                    </div>
 
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="role" class="form-label">Peran <span class="text-danger">*</span></label>
                             <select class="form-select @error('role') is-invalid @enderror" id="role" name="role" required>
-                                <option value="user" {{ old('role') == 'user' ? 'selected' : '' }}>Pengguna</option>
+                                <option value="">Pilih Peran</option>
+                                <option value="member" {{ old('role') == 'member' ? 'selected' : '' }}>Pengguna</option>
                                 <option value="moderator" {{ old('role') == 'moderator' ? 'selected' : '' }}>Moderator</option>
                                 <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
                             </select>
                             @error('role')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="form-text text-muted">
-                                <strong>Admin:</strong> Akses penuh ke semua fitur. <strong>Moderator:</strong> Akses ke moderasi konten.
-                            </small>
                         </div>
                     </div>
                 </div>
@@ -245,23 +229,6 @@
             const icon = this.querySelector('i');
             icon.classList.toggle('fa-eye');
             icon.classList.toggle('fa-eye-slash');
-        });
-
-        // Auto generate username from name
-        const nameInput = document.getElementById('name');
-        const usernameInput = document.getElementById('username');
-
-        nameInput.addEventListener('input', function() {
-            // Only suggest username if the field is empty
-            if (!usernameInput.value) {
-                const suggestedUsername = this.value
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, '_')
-                    .replace(/_+/g, '_')
-                    .replace(/^_|_$/g, '');
-
-                usernameInput.value = suggestedUsername;
-            }
         });
     });
 </script>

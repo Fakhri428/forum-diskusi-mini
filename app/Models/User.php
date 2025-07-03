@@ -15,10 +15,15 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'phone',
-        'location',
+        'role',
         'bio',
+        'location',
+        'website',
         'avatar',
+        'email_verified_at',
+        'is_active',
+        'banned_at',
+        'ban_reason',
     ];
 
     protected $hidden = [
@@ -68,7 +73,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is an admin
+     * Check if user is admin
      */
     public function isAdmin()
     {
@@ -76,10 +81,30 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is a moderator
+     * Check if user is moderator
+
+    /**
+     * Check if user is member.
+     *
+     * @return bool
      */
-    public function isModerator()
+    public function isMember()
     {
-        return $this->role === 'moderator';
+        return $this->role === 'member';
+    }
+
+    /**
+     * Get user role display name.
+     *
+     * @return string
+     */
+    public function getRoleDisplayAttribute()
+    {
+        return match($this->role) {
+            'admin' => 'Administrator',
+            'moderator' => 'Moderator',
+            'member' => 'Pengguna',
+            default => 'Pengguna'
+        };
     }
 }

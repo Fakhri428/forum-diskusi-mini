@@ -10,127 +10,107 @@
 <meta property="og:url" content="{{ url()->current() }}">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 @if($thread->image)
-    <meta property="og:image" content="{{ asset($thread->image) }}">
+    <meta property="og:image" content="{{ asset('storage/' . $thread->image) }}">
 @endif
 @endsection
 
 @section('styles')
 <style>
+    /* Thread Header Styles */
+    .thread-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+    }
+
+    .thread-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .author-avatar {
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .author-name {
+        font-weight: 600;
+        color: white;
+    }
+
+    .category-badge {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Thread Container Improvements */
     .thread-container {
-        background-color: #ffffff;
+        background: white;
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         overflow: hidden;
         margin-bottom: 30px;
     }
 
-    .thread-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 30px;
-        position: relative;
-    }
-
-    .thread-header::before {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 20px;
-        background: white;
-        border-radius: 20px 20px 0 0;
-    }
-
     .thread-meta {
-        background-color: #f8f9fa;
+        background: #f8f9fa;
         padding: 20px 30px;
-        border-bottom: 1px solid #e9ecef;
-    }
-
-    .thread-content {
-        padding: 30px;
-        background-color: #ffffff;
-    }
-
-    .thread-content img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 8px;
-        margin: 15px 0;
-    }
-
-    .author-info {
-        display: flex;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-
-    .author-avatar {
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 18px;
-        margin-right: 15px;
-        border: 3px solid white;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    .thread-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 15px;
-    }
-
-    .thread-badge {
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .badge-pinned {
-        background-color: #ffeaa7;
-        color: #fdcb6e;
-    }
-
-    .badge-locked {
-        background-color: #fab1a0;
-        color: #e17055;
-    }
-
-    .badge-category {
-        background-color: #74b9ff;
-        color: #0984e3;
+        border-bottom: 1px solid #dee2e6;
     }
 
     .thread-stats {
         display: flex;
-        align-items: center;
-        gap: 20px;
-        color: #6c757d;
-        font-size: 14px;
+        gap: 30px;
+        flex-wrap: wrap;
     }
 
     .stat-item {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 8px;
+        color: #6c757d;
+        font-weight: 500;
     }
 
+    .stat-item i {
+        color: #6a11cb;
+    }
+
+    /* Thread Content Improvements */
+    .thread-content {
+        padding: 30px;
+    }
+
+    .thread-body {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: #333;
+    }
+
+    .thread-body img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 20px 0;
+    }
+
+    /* Thread Actions Improvements */
     .thread-actions {
+        background: #f8f9fa;
         padding: 20px 30px;
-        background-color: #f8f9fa;
-        border-top: 1px solid #e9ecef;
+        border-top: 1px solid #dee2e6;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -140,202 +120,93 @@
 
     .action-buttons {
         display: flex;
-        gap: 10px;
+        gap: 15px;
         align-items: center;
+        flex-wrap: wrap;
     }
 
     .vote-buttons {
         display: flex;
-        flex-direction: column;
         align-items: center;
-        gap: 5px;
+        gap: 10px;
+        background: white;
+        padding: 8px 15px;
+        border-radius: 25px;
+        border: 1px solid #dee2e6;
     }
 
     .vote-btn {
-        border: none;
         background: none;
-        font-size: 18px;
+        border: none;
         color: #6c757d;
+        font-size: 1.2rem;
+        cursor: pointer;
         transition: all 0.3s ease;
         padding: 5px;
-        border-radius: 5px;
+        border-radius: 50%;
     }
 
     .vote-btn:hover {
-        background-color: #e9ecef;
-        color: #495057;
+        color: #6a11cb;
+        background: rgba(106, 17, 203, 0.1);
     }
 
     .vote-btn.active {
-        color: #667eea;
+        color: #6a11cb;
+        background: rgba(106, 17, 203, 0.2);
     }
 
     .vote-count {
-        font-weight: bold;
-        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        min-width: 30px;
+        text-align: center;
     }
 
-    /* Comment Section Styles */
+    /* Comment Section Improvements */
     .comment-section {
-        background-color: #ffffff;
+        background: white;
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         overflow: hidden;
-        margin-top: 30px;
     }
 
     .comment-header {
         background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
         color: white;
-        padding: 25px 30px;
-        position: relative;
-    }
-
-    .comment-header::before {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 20px;
-        background: white;
-        border-radius: 20px 20px 0 0;
+        padding: 30px;
     }
 
     .comment-body {
         padding: 30px;
     }
 
-    .comment-item {
-        background-color: #f8f9fa;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 20px;
-        border-left: 4px solid #667eea;
-        transition: all 0.3s ease;
-    }
-
-    .comment-item:hover {
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .comment-meta {
-        display: flex;
-        justify-content: between;
-        align-items: center;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .comment-author {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .comment-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 14px;
-    }
-
-    .comment-actions {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-    }
-
-    .comment-form {
-        background-color: #f8f9fa;
-        border-radius: 12px;
-        padding: 25px;
-        margin-top: 25px;
-    }
-
-    .comment-textarea {
-        border-radius: 10px;
-        border: 2px solid #e9ecef;
-        padding: 15px;
-        resize: none;
-        transition: all 0.3s ease;
-    }
-
-    .comment-textarea:focus {
-        border-color: #6a11cb;
-        box-shadow: 0 0 0 0.2rem rgba(106, 17, 203, 0.25);
-    }
-
-    .empty-comments {
-        text-align: center;
-        padding: 60px 30px;
-        color: #6c757d;
-    }
-
-    .empty-icon {
-        font-size: 4rem;
-        margin-bottom: 20px;
-        opacity: 0.5;
-    }
-
-    .auth-prompt {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 30px;
-        border-radius: 12px;
-        text-align: center;
-        margin-top: 25px;
-    }
-
-    .reply-form {
-        background-color: #ffffff;
-        border-radius: 8px;
-        padding: 20px;
-        margin-top: 15px;
-        border: 2px solid #e9ecef;
-    }
-
-    .nested-comment {
-        margin-left: 30px;
-        border-left: 2px solid #6a11cb;
-        padding-left: 20px;
-        margin-top: 15px;
-    }
-
-    .gradient-text {
-        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        display: inline-block;
-        font-weight: bold;
-    }
-
+    /* Mobile Responsive */
     @media (max-width: 768px) {
-        .thread-header, .thread-meta, .thread-content, .thread-actions {
-            padding: 20px;
+        .thread-title {
+            font-size: 1.8rem;
         }
 
-        .comment-header, .comment-body {
+        .thread-header,
+        .thread-content,
+        .thread-actions,
+        .comment-header,
+        .comment-body {
             padding: 20px;
         }
 
         .thread-stats {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
+            gap: 15px;
         }
 
         .action-buttons {
             width: 100%;
-            justify-content: space-between;
+            justify-content: center;
+        }
+
+        .thread-actions {
+            flex-direction: column;
+            text-align: center;
         }
     }
 </style>
@@ -343,62 +214,47 @@
 
 @section('content')
 <div class="container py-4">
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ route('home') }}">Beranda</a></li>
-            <li class="breadcrumb-item"><a href="{{ route('threads.index') }}">Thread</a></li>
-            <li class="breadcrumb-item"><a href="{{ route('categories.show', $thread->category) }}">{{ $thread->category->name }}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ Str::limit($thread->title, 50) }}</li>
-        </ol>
-    </nav>
+    <!-- Thread Header -->
+    <div class="thread-header">
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="flex-grow-1">
+                <h1 class="thread-title">{{ $thread->title }}</h1>
+                <div class="thread-meta d-flex align-items-center flex-wrap gap-3 mt-2">
+                    <div class="author-info d-flex align-items-center">
+                        <div class="author-avatar me-2">
+                            {{ strtoupper(substr($thread->user->name, 0, 1)) }}
+                        </div>
+                        <div>
+                            <span class="author-name">{{ $thread->user->name }}</span>
+                            <small class="text-muted d-block">{{ $thread->created_at->diffForHumans() }}</small>
+                        </div>
+                    </div>
 
-    <!-- Thread Content -->
-    <div class="thread-container">
-        <!-- Thread Header -->
-        <div class="thread-header">
-            <h1 class="mb-3">{{ $thread->title }}</h1>
+                    @if($thread->category)
+                        <span class="badge category-badge">
+                            <i class="fas fa-folder me-1"></i>{{ $thread->category->name }}
+                        </span>
+                    @endif
 
-            <div class="thread-badges">
-                @if($thread->is_pinned)
-                    <span class="thread-badge badge-pinned">
-                        <i class="fas fa-thumbtack me-1"></i>Disematkan
-                    </span>
-                @endif
+                    @if($thread->is_pinned)
+                        <span class="badge bg-warning">
+                            <i class="fas fa-thumbtack me-1"></i>Pinned
+                        </span>
+                    @endif
 
-                @if($thread->is_locked)
-                    <span class="thread-badge badge-locked">
-                        <i class="fas fa-lock me-1"></i>Dikunci
-                    </span>
-                @endif
-
-                <span class="thread-badge badge-category">
-                    <i class="fas fa-folder me-1"></i>{{ $thread->category->name }}
-                </span>
+                    @if($thread->is_locked)
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-lock me-1"></i>Locked
+                        </span>
+                    @endif
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Thread Meta Information -->
+    <div class="thread-container">
+        {{-- existing thread-meta section --}}
         <div class="thread-meta">
-            <div class="author-info">
-                <div class="author-avatar">
-                    {{ strtoupper(substr($thread->user->name, 0, 1)) }}
-                </div>
-                <div>
-                    <h6 class="mb-0">{{ $thread->user->name }}</h6>
-                    <small class="text-muted">
-                        <i class="fas fa-clock me-1"></i>
-                        Dibuat {{ $thread->created_at->diffForHumans() }}
-                        @if($thread->created_at != $thread->updated_at)
-                            <span class="ms-2">
-                                <i class="fas fa-edit me-1"></i>
-                                Diubah {{ $thread->updated_at->diffForHumans() }}
-                            </span>
-                        @endif
-                    </small>
-                </div>
-            </div>
-
             <div class="thread-stats">
                 <div class="stat-item">
                     <i class="fas fa-eye"></i>
@@ -406,7 +262,6 @@
                 </div>
                 <div class="stat-item">
                     <i class="fas fa-comments"></i>
-                    {{-- FIX: Gunakan $totalComments dari controller --}}
                     <span>{{ $totalComments ?? $thread->comments->count() }} komentar</span>
                 </div>
                 <div class="stat-item">
@@ -445,11 +300,11 @@
                 @auth
                     <!-- Vote Buttons -->
                     <div class="vote-buttons">
-                        <button class="vote-btn" data-type="up" data-thread="{{ $thread->id }}">
+                        <button class="vote-btn" data-type="up" data-thread="{{ $thread->id }}" title="Upvote">
                             <i class="fas fa-chevron-up"></i>
                         </button>
                         <span class="vote-count">{{ $thread->votes_sum ?? 0 }}</span>
-                        <button class="vote-btn" data-type="down" data-thread="{{ $thread->id }}">
+                        <button class="vote-btn" data-type="down" data-thread="{{ $thread->id }}" title="Downvote">
                             <i class="fas fa-chevron-down"></i>
                         </button>
                     </div>
@@ -459,15 +314,10 @@
                         <i class="fas fa-share-alt me-1"></i>Bagikan
                     </button>
 
-                    <button class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-bookmark me-1"></i>Simpan
-                    </button>
-
                     @if(Auth::id() === $thread->user_id)
                         <a href="{{ route('threads.edit', $thread) }}" class="btn btn-outline-warning btn-sm">
                             <i class="fas fa-edit me-1"></i>Edit
                         </a>
-
                         <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
                             <i class="fas fa-trash me-1"></i>Hapus
                         </button>
@@ -611,7 +461,9 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="shareModalLabel">Bagikan Thread</h5>
+                <h5 class="modal-title" id="shareModalLabel">
+                    <i class="fas fa-share-alt me-2"></i>Bagikan Thread
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -634,7 +486,7 @@
                        target="_blank" class="btn btn-info">
                         <i class="fab fa-twitter me-1"></i>Twitter
                     </a>
-                    <a href="https://wa.me/?text={{ urlencode($thread->title . ' ' . url()->current()) }}"
+                    <a href="https://wa.me/?text={{ urlencode($thread->title . ' - ' . url()->current()) }}"
                        target="_blank" class="btn btn-success">
                         <i class="fab fa-whatsapp me-1"></i>WhatsApp
                     </a>
@@ -650,15 +502,16 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Hapus Thread</h5>
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2 text-danger"></i>Konfirmasi Hapus
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>Apakah Anda yakin ingin menghapus thread ini?</p>
-                <p class="text-danger small">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
-                    Tindakan ini tidak dapat dibatalkan dan semua komentar akan ikut terhapus.
-                </p>
+                <div class="alert alert-warning">
+                    <small><i class="fas fa-info-circle me-1"></i>Tindakan ini tidak dapat dibatalkan dan akan menghapus semua komentar terkait.</small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -856,7 +709,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Vote functionality with correct route from VoteController
+    // Vote functionality with improved error handling
     function setupVoting() {
         document.querySelectorAll('.vote-btn').forEach(button => {
             button.addEventListener('click', function() {
@@ -864,21 +717,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 const threadId = this.dataset.thread;
                 const commentId = this.dataset.comment;
 
-                console.log('Vote clicked:', { type, threadId, commentId });
+                // Disable button during request
+                this.disabled = true;
+                const originalContent = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
                 let url;
                 if (threadId) {
-                    // Fix: Use correct route from VoteController
                     url = `/vote/thread/${threadId}`;
                 } else if (commentId) {
-                    // Fix: Use correct route from VoteController
                     url = `/vote/comment/${commentId}`;
                 } else {
                     console.error('No thread or comment ID found');
+                    this.disabled = false;
+                    this.innerHTML = originalContent;
                     return;
                 }
 
-                // Send AJAX request to vote endpoint
                 fetch(url, {
                     method: 'POST',
                     headers: {
@@ -887,7 +742,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ value: type === 'up' ? 1 : -1 })
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         const voteCountEl = this.parentElement.querySelector('.vote-count');
@@ -905,11 +765,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 activeBtn.classList.add('active');
                             }
                         }
+                    } else {
+                        throw new Error(data.message || 'Vote failed');
                     }
                 })
                 .catch(error => {
                     console.error('Vote error:', error);
-                    alert('Terjadi kesalahan saat voting. Silakan coba lagi.');
+                    alert('Terjadi kesalahan saat voting: ' + error.message);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    this.disabled = false;
+                    this.innerHTML = originalContent;
                 });
             });
         });

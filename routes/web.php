@@ -187,5 +187,27 @@ Route::middleware(['auth'])->group(function () {
          ->name('vote.comment');
 });
 
+// ADD: Vote routes for AJAX functionality
+
+Route::middleware('auth')->group(function () {
+    // Vote routes
+    Route::post('/vote/thread/{thread}', [VoteController::class, 'voteThread'])->name('vote.thread');
+    Route::post('/vote/comment/{comment}', [VoteController::class, 'voteComment'])->name('vote.comment');
+});
+
+// Update middleware routes to use 'member' instead of 'user'
+
+Route::middleware(['auth', 'role:member,moderator,admin'])->group(function () {
+    // Routes accessible by all authenticated users
+});
+
+Route::middleware(['auth', 'role:moderator,admin'])->group(function () {
+    // Moderator and admin routes
+});
+
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    // Admin only routes
+});
+
 
 

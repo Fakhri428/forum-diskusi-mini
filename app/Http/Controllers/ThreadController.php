@@ -180,6 +180,9 @@ class ThreadController extends Controller
      */
     public function show(Thread $thread)
     {
+        // Increment views count
+        $thread->increment('views_count');
+
         // Load thread dengan relationships
         $thread->load(['user', 'category']);
 

@@ -363,42 +363,27 @@
     <!-- Threads List -->
     @forelse ($threads as $thread)
         <div class="card thread-card">
-            <!-- Thread Header -->
-            <div class="thread-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <div class="user-avatar me-3">
-                        {{ strtoupper(substr($thread->user->name, 0, 1)) }}
-                    </div>
-                    <div>
-                        <strong>{{ $thread->user->name }}</strong>
-                        <div class="small opacity-75">
-                            <i class="far fa-clock me-1"></i>{{ $thread->created_at->diffForHumans() }}
+            <div class="card-body">
+                <!-- Thread Header -->
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="flex-grow-1">
+                        <h5 class="thread-title mb-2">
+                            <a href="{{ route('threads.show', $thread) }}" class="text-decoration-none">
+                                {{ $thread->title }}
+                            </a>
+                        </h5>
+                        <div class="thread-meta-small d-flex align-items-center flex-wrap gap-2 mb-2">
+                            <span class="text-muted small">
+                                <i class="fas fa-user me-1"></i>{{ $thread->user->name }}
+                            </span>
+                            <span class="text-muted small">
+                                <i class="fas fa-clock me-1"></i>{{ $thread->created_at->diffForHumans() }}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                @if($thread->is_pinned)
-                    <span class="badge bg-warning">
-                        <i class="fas fa-thumbtack me-1"></i>Pinned
-                    </span>
-                @endif
-            </div>
-
-            <!-- Thread Content -->
-            <div class="card-body">
-                <!-- Thread Title -->
-                <h5 class="mb-3">
-                    <a href="{{ route('threads.show', $thread) }}" class="thread-title">
-                        {{ $thread->title }}
-                    </a>
-                    @if($thread->is_locked)
-                        <span class="badge bg-secondary ms-2">
-                            <i class="fas fa-lock me-1"></i>Locked
-                        </span>
-                    @endif
-                </h5>
-
-                <!-- Category and Tags -->
+                <!-- Categories and Tags -->
                 <div class="d-flex flex-wrap align-items-center mb-3">
                     @if($thread->category)
                         <span class="badge category-badge me-2">

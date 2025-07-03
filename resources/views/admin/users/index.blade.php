@@ -199,13 +199,19 @@
                                     @endunless
                                 </td>
                                 <td>
-                                    @if($user->isAdmin())
-                                        <span class="badge bg-danger role-badge">Admin</span>
-                                    @elseif($user->isModerator())
-                                        <span class="badge bg-info role-badge">Moderator</span>
-                                    @else
-                                        <span class="badge bg-success role-badge">Pengguna</span>
-                                    @endif
+                                    @switch($user->role)
+                                        @case('admin')
+                                            <span class="badge bg-danger">Administrator</span>
+                                            @break
+                                        @case('moderator')
+                                            <span class="badge bg-warning">Moderator</span>
+                                            @break
+                                        @case('member')
+                                            <span class="badge bg-primary">Pengguna</span>
+                                            @break
+                                        @default
+                                            <span class="badge bg-secondary">Tidak Diketahui</span>
+                                    @endswitch
                                 </td>
                                 <td>
                                     @if($user->banned_at)
