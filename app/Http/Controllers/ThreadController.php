@@ -180,121 +180,22 @@ class ThreadController extends Controller
      */
     public function show(Thread $thread)
     {
-        try {
-            // Enhanced debugging
-            Log::info('=== THREAD SHOW START ===', [
-                'thread_id' => $thread->id,
-                'user_id' => Auth::id(),
-                'thread_approved' => $thread->is_approved,
-                'thread_exists' => $thread->exists
-            ]);
+        // Load thread dengan relationships
+        $thread->load(['user', 'category']);
 
-            // Basic validations
-            if (!$thread->exists) {
-                Log::error('Thread does not exist');
-                abort(404, 'Thread tidak ditemukan.');
-            }
+        // Load comments dengan struktur nested
+        $comments = Comment::with(['user', 'children.user'])
+                      ->where('thread_id', $thread->id)
+                      ->whereNull('parent_id')
+                      ->where('is_approved', true)
+                      ->orderBy('created_at', 'asc')
+                      ->get();
 
-            // Check thread approval with detailed logging
-            if (!$thread->is_approved) {
-                $canAccess = Auth::check() &&
-                            ($thread->user_id === Auth::id() || $this->userCanModerate());
+        $totalComments = Comment::where('thread_id', $thread->id)
+                           ->where('is_approved', true)
+                           ->count();
 
-                Log::info('Thread approval check', [
-                    'is_approved' => $thread->is_approved,
-                    'user_authenticated' => Auth::check(),
-                    'is_owner' => Auth::check() && $thread->user_id === Auth::id(),
-                    'can_moderate' => Auth::check() && $this->userCanModerate(),
-                    'can_access' => $canAccess
-                ]);
-
-                if (!$canAccess) {
-                    abort(404, 'Thread tidak ditemukan atau belum disetujui.');
-                }
-            }
-
-            // Safe increment views count
-            try {
-                $thread->increment('views_count');
-                Log::info('Views count incremented');
-            } catch (\Exception $e) {
-                Log::warning('Failed to increment views: ' . $e->getMessage());
-            }
-
-            // Load thread relationships safely
-            try {
-                $thread->load(['user:id,name,email', 'category:id,name,slug,icon,color']);
-                Log::info('Thread relationships loaded');
-            } catch (\Exception $e) {
-                Log::warning('Failed to load thread relationships: ' . $e->getMessage());
-            }
-
-            // SIMPLIFIED comment loading to prevent errors
-            $comments = collect();
-            $totalComments = 0;
-
-            try {
-                // Load only root comments with basic relationships
-                $rootComments = Comment::with(['user:id,name,email'])
-                                    ->where('thread_id', $thread->id)
-                                    ->whereNull('parent_id')
-                                    ->where('is_approved', true)
-                                    ->orderBy('created_at', 'asc')
-                                    ->get();
-
-                Log::info('Root comments loaded', ['count' => $rootComments->count()]);
-
-                // Load children manually with better error handling
-                foreach ($rootComments as $comment) {
-                    try {
-                        $comment->depth = 0; // Set root depth
-                        $this->loadCommentsChildren($comment, 1, 3); // Max 3 levels
-                    } catch (\Exception $e) {
-                        Log::warning('Error loading children for comment ' . $comment->id . ': ' . $e->getMessage());
-                        // Continue with other comments
-                    }
-                }
-
-                $comments = $rootComments;
-
-                // Count total approved comments
-                $totalComments = Comment::where('thread_id', $thread->id)
-                                       ->where('is_approved', true)
-                                       ->count();
-
-                Log::info('Comments processing completed', [
-                    'root_comments' => $comments->count(),
-                    'total_comments' => $totalComments
-                ]);
-
-            } catch (\Exception $e) {
-                Log::error('Error in comment loading: ' . $e->getMessage(), [
-                    'thread_id' => $thread->id,
-                    'stack_trace' => $e->getTraceAsString()
-                ]);
-
-                // Continue with empty collection instead of failing
-                $comments = collect();
-                $totalComments = 0;
-            }
-
-            Log::info('=== THREAD SHOW SUCCESS ===');
-
-            return view('threads.show', compact('thread', 'comments', 'totalComments'));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            // Re-throw HTTP exceptions (404, 403, etc.)
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Critical error in thread show: ' . $e->getMessage(), [
-                'thread_id' => $thread->id ?? 'unknown',
-                'user_id' => Auth::id(),
-                'stack_trace' => $e->getTraceAsString()
-            ]);
-
-            return redirect()->route('threads.index')
-                           ->with('error', 'Thread tidak dapat dimuat. Silakan coba lagi.');
-        }
+        return view('threads.show', compact('thread', 'comments', 'totalComments'));
     }
 
     /**
@@ -385,7 +286,8 @@ class ThreadController extends Controller
                 'body' => 'required|string|min:10',
                 'category_id' => 'required|exists:categories,id',
                 'tags' => 'nullable|string|max:500',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'remove_image' => 'nullable|boolean'
             ], [
                 'title.required' => 'Judul thread harus diisi.',
                 'title.max' => 'Judul tidak boleh lebih dari 255 karakter.',
@@ -416,31 +318,45 @@ class ThreadController extends Controller
                 $validated['tags'] = null;
             }
 
-            // Handle image upload
-            if ($request->hasFile('image')) {
+            // Handle image operations
+            if ($request->has('remove_image') && $request->remove_image) {
+                // Delete old image
+                if ($thread->image && Storage::disk('public')->exists($thread->image)) {
+                    Storage::disk('public')->delete($thread->image);
+                }
+                $validated['image'] = null;
+            } elseif ($request->hasFile('image')) {
                 // Delete old image
                 if ($thread->image && Storage::disk('public')->exists($thread->image)) {
                     Storage::disk('public')->delete($thread->image);
                 }
 
+                // Upload new image
                 $image = $request->file('image');
                 $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
                 $imagePath = $image->storeAs('threads', $imageName, 'public');
                 $validated['image'] = $imagePath;
             }
 
+            // Remove fields that shouldn't be updated
+            unset($validated['remove_image']);
+
             $thread->update($validated);
 
             return redirect()->route('threads.show', $thread->id)
                            ->with('success', 'Thread berhasil diperbarui!');
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
-            Log::error('Error updating thread: ' . $e->getMessage(), [
+            \Log::error('Error updating thread: ' . $e->getMessage(), [
                 'thread_id' => $thread->id,
-                'user_id' => Auth::id()
+                'user_id' => Auth::id(),
+                'stack_trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['image', '_token'])
             ]);
 
-            return back()->with('error', 'Terjadi kesalahan saat memperbarui thread.')->withInput();
+            return back()->with('error', 'Terjadi kesalahan saat memperbarui thread: ' . $e->getMessage())->withInput();
         }
     }
 

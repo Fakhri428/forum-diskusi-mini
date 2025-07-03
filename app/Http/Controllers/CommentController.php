@@ -88,7 +88,7 @@ class CommentController extends Controller
                 'user_id' => Auth::id(),
                 'parent_id' => $validated['parent_id'] ?? null,
                 'depth' => $depth,
-                'is_approved' => $this->shouldAutoApprove(),
+                'is_approved' => true,
                 'vote_score' => 0
             ]);
 

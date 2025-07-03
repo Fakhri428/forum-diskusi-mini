@@ -13,14 +13,14 @@ class Thread extends Model
     protected $fillable = [
         'title',
         'body',
-        'image',
-        'tags',
         'category_id',
         'user_id',
+        'tags',
+        'image',
         'is_approved',
-        'views_count',
         'is_pinned',
         'is_locked',
+        'views_count',
         'vote_score'
     ];
 

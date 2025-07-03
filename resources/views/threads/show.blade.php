@@ -8,6 +8,7 @@
 <meta property="og:description" content="{{ Str::limit(strip_tags($thread->body), 160) }}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="{{ url()->current() }}">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 @if($thread->image)
     <meta property="og:image" content="{{ asset($thread->image) }}">
 @endif
@@ -405,7 +406,8 @@
                 </div>
                 <div class="stat-item">
                     <i class="fas fa-comments"></i>
-                    <span>{{ $thread->comments->count() }} komentar</span>
+                    {{-- FIX: Gunakan $totalComments dari controller --}}
+                    <span>{{ $totalComments ?? $thread->comments->count() }} komentar</span>
                 </div>
                 <div class="stat-item">
                     <i class="fas fa-thumbs-up"></i>
@@ -489,29 +491,53 @@
                     </div>
                 </div>
                 <div>
-                    <h3 class="mb-0 gradient-text">Diskusi ({{ $thread->comments->where('parent_id', null)->count() }})</h3>
+                    {{-- UPDATE: Gunakan $totalComments dari controller --}}
+                    <h3 class="mb-0 gradient-text">Diskusi ({{ $totalComments ?? 0 }})</h3>
                     <p class="mb-0 mt-1 opacity-75">Berpartisipasilah dalam diskusi konstruktif</p>
                 </div>
             </div>
         </div>
 
         <div class="comment-body">
-            @if($thread->is_locked)
+            @if($thread->is_locked ?? false)
                 <div class="alert alert-warning">
                     <i class="fas fa-lock me-2"></i>
                     Thread ini telah dikunci. Komentar baru tidak dapat ditambahkan.
                 </div>
             @endif
 
-            @if($thread->comments->where('parent_id', null)->count() > 0)
+            {{-- Debug info untuk development --}}
+            @if(config('app.debug'))
+                <div class="alert alert-info small mb-3">
+                    <strong>Debug Info:</strong><br>
+                    Thread ID: {{ $thread->id }}<br>
+                    Total Comments: {{ $totalComments ?? 'undefined' }}<br>
+                    Comments Variable: {{ isset($comments) ? 'defined (' . $comments->count() . ' items)' : 'undefined' }}<br>
+                    User Authenticated: {{ Auth::check() ? 'Yes' : 'No' }}<br>
+                    Comments Store Route: {{ route('comments.store', $thread) }}
+                </div>
+            @endif
+
+            {{-- SINGLE Comments Display Section --}}
+            @if(isset($comments) && $comments->count() > 0)
                 <div class="comments-container">
-                    {{-- TAMBAHKAN INI - Set level awal ke 0 --}}
                     @include('threads.partials.comments', [
-                        'comments' => $thread->comments()->whereNull('parent_id')->with('user', 'votes', 'children.user', 'children.votes')->latest()->get(),
-                        'level' => 0
+                        'comments' => $comments,
+                        'level' => 0,
+                        'thread' => $thread
+                    ])
+                </div>
+            @elseif(isset($thread->comments) && $thread->comments->where('parent_id', null)->count() > 0)
+                {{-- Fallback: Gunakan relationship jika $comments tidak ada --}}
+                <div class="comments-container">
+                    @include('threads.partials.comments', [
+                        'comments' => $thread->comments()->whereNull('parent_id')->with('user', 'children.user')->orderBy('created_at', 'asc')->get(),
+                        'level' => 0,
+                        'thread' => $thread
                     ])
                 </div>
             @else
+                {{-- Empty state --}}
                 <div class="text-center py-5">
                     <div class="mb-3">
                         <i class="fas fa-comments fa-4x text-muted"></i>
@@ -520,8 +546,8 @@
                     <p class="text-muted">Jadilah yang pertama berkomentar!</p>
 
                     @auth
-                        @if(!$thread->is_locked)
-                            <button type="button" class="btn btn-primary" onclick="document.getElementById('comment-form').scrollIntoView({behavior: 'smooth'})">
+                        @if(!($thread->is_locked ?? false))
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('commentForm').scrollIntoView({behavior: 'smooth'})">
                                 <i class="fas fa-comment me-1"></i>Tulis Komentar
                             </button>
                         @endif
@@ -533,9 +559,10 @@
                 </div>
             @endif
 
+            {{-- Main Comment Form --}}
             @auth
-                @if(!$thread->is_locked)
-                    <div class="comment-form">
+                @if(!($thread->is_locked ?? false))
+                    <div class="comment-form mt-4" id="comment-form">
                         <div class="d-flex mb-3">
                             <div class="comment-avatar me-3">
                                 {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
@@ -550,14 +577,19 @@
                                          class="form-control comment-textarea"
                                          placeholder="Bagikan pendapat Anda tentang diskusi ini..."
                                          rows="4"
-                                         required></textarea>
+                                         required>{{ old('body') }}</textarea>
+
+                                @error('body')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
                             </div>
+
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="text-muted small">
                                     <i class="fas fa-info-circle me-1"></i>
                                     Komentar yang baik membantu diskusi menjadi lebih berkualitas
                                 </div>
-                                <button type="submit" class="btn btn-primary">
+                                <button type="submit" class="btn btn-primary" id="submitCommentBtn">
                                     <i class="fas fa-paper-plane me-2"></i>Kirim Komentar
                                 </button>
                             </div>
@@ -565,7 +597,7 @@
                     </div>
                 @endif
             @else
-                <div class="auth-prompt">
+                <div class="auth-prompt mt-4">
                     <h5><i class="fas fa-lock me-2"></i>Bergabung dalam Diskusi</h5>
                     <p class="mb-3">Untuk berpartisipasi dalam diskusi, silahkan login atau daftar terlebih dahulu</p>
                     <div>
@@ -655,79 +687,266 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Thread show page loaded');
+
     // Copy URL functionality
-    document.getElementById('copyUrl').addEventListener('click', function() {
-        const urlInput = document.getElementById('shareUrl');
-        urlInput.select();
-        document.execCommand('copy');
+    const copyBtn = document.getElementById('copyUrl');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+            const urlInput = document.getElementById('shareUrl');
+            urlInput.select();
+            document.execCommand('copy');
 
-        // Show feedback
-        const originalText = this.innerHTML;
-        this.innerHTML = '<i class="fas fa-check"></i>';
-        this.classList.add('btn-success');
-        this.classList.remove('btn-outline-primary');
+            // Show feedback
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check"></i>';
+            this.classList.add('btn-success');
+            this.classList.remove('btn-outline-primary');
 
-        setTimeout(() => {
-            this.innerHTML = originalText;
-            this.classList.remove('btn-success');
-            this.classList.add('btn-outline-primary');
-        }, 2000);
-    });
-
-    // Vote functionality (if you have voting system)
-    document.querySelectorAll('.vote-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const type = this.dataset.type;
-            const threadId = this.dataset.thread;
-
-            // Send AJAX request to vote endpoint
-            // This is a placeholder - implement according to your voting system
-            fetch(`/threads/${threadId}/vote`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ type: type })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.querySelector('.vote-count').textContent = data.total;
-                    // Update button states
-                    document.querySelectorAll('.vote-btn').forEach(btn => btn.classList.remove('active'));
-                    if (data.user_vote) {
-                        document.querySelector(`[data-type="${data.user_vote}"]`).classList.add('active');
-                    }
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        });
-    });
-
-    // Auto-resize textarea
-    const textarea = document.querySelector('.comment-textarea');
-    if (textarea) {
-        textarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.max(this.scrollHeight, 100) + 'px';
+            setTimeout(() => {
+                this.innerHTML = originalText;
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-primary');
+            }, 2000);
         });
     }
 
-    // Reply functionality (implement according to your comment system)
-    document.querySelectorAll('.reply-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const commentId = this.dataset.commentId;
-            const replyForm = document.getElementById(`reply-form-${commentId}`);
+    // Main Comment Form submission
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+        console.log('Main comment form found:', commentForm.action);
 
-            if (replyForm) {
-                replyForm.classList.toggle('d-none');
-                if (!replyForm.classList.contains('d-none')) {
-                    replyForm.querySelector('textarea').focus();
-                }
+        commentForm.addEventListener('submit', function(e) {
+            console.log('Main comment form submitted');
+
+            const textarea = this.querySelector('textarea[name="body"]');
+            const submitBtn = document.getElementById('submitCommentBtn');
+
+            // Validation
+            if (textarea && textarea.value.trim().length < 5) {
+                e.preventDefault();
+                alert('Komentar minimal 5 karakter');
+                textarea.focus();
+                return false;
+            }
+
+            // Loading state
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Mengirim...';
+                submitBtn.disabled = true;
             }
         });
-    });
+    } else {
+        console.error('Main comment form NOT found');
+    }
+
+    // Reply Button Functionality
+    function setupReplyButtons() {
+        document.querySelectorAll('.reply-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Reply button clicked');
+
+                const commentId = this.dataset.commentId;
+                const replyFormId = `reply-form-${commentId}`;
+                const replyForm = document.getElementById(replyFormId);
+
+                console.log('Comment ID:', commentId);
+                console.log('Reply form ID:', replyFormId);
+                console.log('Reply form found:', replyForm !== null);
+
+                if (replyForm) {
+                    // Toggle visibility
+                    const isHidden = replyForm.style.display === 'none' || replyForm.classList.contains('d-none');
+
+                    if (isHidden) {
+                        replyForm.style.display = 'block';
+                        replyForm.classList.remove('d-none');
+
+                        // Focus on textarea
+                        const textarea = replyForm.querySelector('textarea[name="body"]');
+                        if (textarea) {
+                            setTimeout(() => textarea.focus(), 100);
+                        }
+
+                        // Update button text
+                        this.innerHTML = '<i class="fas fa-times me-1"></i>Batal';
+                        this.classList.remove('btn-outline-primary');
+                        this.classList.add('btn-outline-secondary');
+                    } else {
+                        replyForm.style.display = 'none';
+                        replyForm.classList.add('d-none');
+
+                        // Reset button text
+                        this.innerHTML = '<i class="fas fa-reply me-1"></i>Balas';
+                        this.classList.remove('btn-outline-secondary');
+                        this.classList.add('btn-outline-primary');
+                    }
+                } else {
+                    console.error('Reply form not found for comment:', commentId);
+                }
+            });
+        });
+    }
+
+    // Cancel Reply Button Functionality
+    function setupCancelButtons() {
+        document.querySelectorAll('.cancel-reply-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                const commentId = this.dataset.commentId;
+                const replyForm = document.getElementById(`reply-form-${commentId}`);
+                const replyBtn = document.querySelector(`[data-comment-id="${commentId}"].reply-btn`);
+
+                if (replyForm) {
+                    replyForm.style.display = 'none';
+                    replyForm.classList.add('d-none');
+
+                    // Reset textarea
+                    const textarea = replyForm.querySelector('textarea[name="body"]');
+                    if (textarea) {
+                        textarea.value = '';
+                    }
+                }
+
+                if (replyBtn) {
+                    replyBtn.innerHTML = '<i class="fas fa-reply me-1"></i>Balas';
+                    replyBtn.classList.remove('btn-outline-secondary');
+                    replyBtn.classList.add('btn-outline-primary');
+                }
+            });
+        });
+    }
+
+    // Reply Form Submission
+    function setupReplyFormSubmissions() {
+        document.querySelectorAll('form[id^="reply-form-"]').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                console.log('Reply form submitted:', this.action);
+
+                const textarea = this.querySelector('textarea[name="body"]');
+                const submitBtn = this.querySelector('button[type="submit"]');
+
+                // Validation
+                if (textarea && textarea.value.trim().length < 5) {
+                    e.preventDefault();
+                    alert('Balasan minimal 5 karakter');
+                    textarea.focus();
+                    return false;
+                }
+
+                // Loading state
+                if (submitBtn) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Mengirim...';
+                    submitBtn.disabled = true;
+
+                    // Reset after timeout if something goes wrong
+                    setTimeout(() => {
+                        if (submitBtn.disabled) {
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }
+                    }, 10000);
+                }
+            });
+        });
+    }
+
+    // Auto-resize textarea
+    function setupTextareas() {
+        document.querySelectorAll('.comment-textarea').forEach(textarea => {
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.max(this.scrollHeight, 80) + 'px';
+            });
+        });
+    }
+
+    // Vote functionality with correct route from VoteController
+    function setupVoting() {
+        document.querySelectorAll('.vote-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const type = this.dataset.type;
+                const threadId = this.dataset.thread;
+                const commentId = this.dataset.comment;
+
+                console.log('Vote clicked:', { type, threadId, commentId });
+
+                let url;
+                if (threadId) {
+                    // Fix: Use correct route from VoteController
+                    url = `/vote/thread/${threadId}`;
+                } else if (commentId) {
+                    // Fix: Use correct route from VoteController
+                    url = `/vote/comment/${commentId}`;
+                } else {
+                    console.error('No thread or comment ID found');
+                    return;
+                }
+
+                // Send AJAX request to vote endpoint
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify({ value: type === 'up' ? 1 : -1 })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const voteCountEl = this.parentElement.querySelector('.vote-count');
+                        if (voteCountEl) {
+                            voteCountEl.textContent = data.total || 0;
+                        }
+
+                        // Update button states
+                        const voteButtons = this.parentElement.querySelectorAll('.vote-btn');
+                        voteButtons.forEach(btn => btn.classList.remove('active'));
+
+                        if (data.user_vote) {
+                            const activeBtn = this.parentElement.querySelector(`[data-type="${data.user_vote > 0 ? 'up' : 'down'}"]`);
+                            if (activeBtn) {
+                                activeBtn.classList.add('active');
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Vote error:', error);
+                    alert('Terjadi kesalahan saat voting. Silakan coba lagi.');
+                });
+            });
+        });
+    }
+
+    // Initialize all functionalities
+    function initializeComments() {
+        setupReplyButtons();
+        setupCancelButtons();
+        setupReplyFormSubmissions();
+        setupTextareas();
+        setupVoting();
+
+        console.log('All comment functionalities initialized');
+    }
+
+    // Initial setup
+    initializeComments();
+
+    // Re-initialize after dynamic content is loaded
+    window.reinitializeComments = initializeComments;
+
+    // Debug info
+    console.log('Debug Info:');
+    console.log('- Thread ID:', {{ $thread->id ?? 'null' }});
+    console.log('- Total Comments:', {{ $totalComments ?? 'undefined' }});
+    console.log('- Comments Variable:', {{ isset($comments) ? '"defined with ' . $comments->count() . ' items"' : '"undefined"' }});
+    console.log('- User Authenticated:', {{ Auth::check() ? 'true' : 'false' }});
+    console.log('- Thread Locked:', {{ ($thread->is_locked ?? false) ? 'true' : 'false' }});
 });
 </script>
 @endpush

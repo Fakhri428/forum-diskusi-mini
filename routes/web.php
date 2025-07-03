@@ -169,24 +169,21 @@ Route::middleware(['auth', \App\Http\Middleware\RoleMiddleware::class . ':modera
 
 // Pastikan route ini ada di dalam middleware auth
 Route::middleware(['auth'])->group(function () {
-    // Comment routes - PASTIKAN ROUTE INI ADA
-    Route::post('threads/{thread}/comments', [App\Http\Controllers\CommentController::class, 'store'])
+    // Comment routes
+    Route::post('threads/{thread}/comments', [CommentController::class, 'store'])
          ->name('comments.store');
 
-    Route::get('comments/{comment}/edit', [App\Http\Controllers\CommentController::class, 'edit'])
+    Route::get('comments/{comment}/edit', [CommentController::class, 'edit'])
          ->name('comments.edit');
 
-    Route::put('comments/{comment}', [App\Http\Controllers\CommentController::class, 'update'])
+    Route::put('comments/{comment}', [CommentController::class, 'update'])
          ->name('comments.update');
 
-    Route::delete('comments/{comment}', [App\Http\Controllers\CommentController::class, 'destroy'])
+    Route::delete('comments/{comment}', [CommentController::class, 'destroy'])
          ->name('comments.destroy');
 
     // Vote routes
-    Route::post('vote/thread/{thread}', [App\Http\Controllers\VoteController::class, 'voteThread'])
-         ->name('vote.thread');
-
-    Route::post('vote/comment/{comment}', [App\Http\Controllers\VoteController::class, 'voteComment'])
+    Route::post('vote/comment/{comment}', [VoteController::class, 'voteComment'])
          ->name('vote.comment');
 });
 

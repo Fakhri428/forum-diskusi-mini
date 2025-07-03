@@ -28,6 +28,14 @@ class Comment extends Model
     ];
 
     /**
+     * Scope for approved comments
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
+    /**
      * Get the user that owns the comment.
      */
     public function user()
@@ -49,14 +57,6 @@ class Comment extends Model
     public function parent()
     {
         return $this->belongsTo(Comment::class, 'parent_id');
-    }
-
-    /**
-     * Scope for approved comments
-     */
-    public function scopeApproved($query)
-    {
-        return $query->where('is_approved', true);
     }
 
     /**
@@ -120,11 +120,7 @@ class Comment extends Model
      */
     public function hasChildren(): bool
     {
-        try {
-            return $this->children()->exists();
-        } catch (\Exception $e) {
-            return false;
-        }
+        return $this->children()->exists();
     }
 
     /**
@@ -140,17 +136,7 @@ class Comment extends Model
      */
     public function getTotalRepliesCount(): int
     {
-        try {
-            $count = $this->children()->count();
-
-            foreach ($this->children as $child) {
-                $count += $child->getTotalRepliesCount();
-            }
-
-            return $count;
-        } catch (\Exception $e) {
-            return 0;
-        }
+        return $this->children()->count();
     }
 
     /**
@@ -210,26 +196,7 @@ class Comment extends Model
      */
     public function voteScore()
     {
-        try {
-            // Use cached vote_score if available and valid
-            if ($this->vote_score !== null) {
-                return $this->vote_score;
-            }
-
-            // Calculate from votes table if no cached value
-            $upvotes = $this->votes()->where('value', 1)->count();
-            $downvotes = $this->votes()->where('value', -1)->count();
-
-            $score = $upvotes - $downvotes;
-
-            // Update cached value
-            $this->updateQuietly(['vote_score' => $score]);
-
-            return $score;
-        } catch (\Exception $e) {
-            Log::warning('Error calculating vote score for comment ' . $this->id . ': ' . $e->getMessage());
-            return 0;
-        }
+        return $this->vote_score ?? 0;
     }
 
     /**
