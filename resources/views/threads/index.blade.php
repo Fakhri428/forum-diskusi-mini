@@ -418,6 +418,16 @@
                 </div>
 
                 <!-- Thread Content Preview -->
+                @if($thread->image)
+                    <div class="thread-image-preview mb-3">
+                        <img src="{{ asset('storage/' . $thread->image) }}"
+                             alt="{{ $thread->title }}"
+                             class="img-fluid rounded"
+                             style="max-height: 200px; width: 100%; object-fit: cover;"
+                             onerror="this.style.display='none'">
+                    </div>
+                @endif
+
                 <div class="thread-content">
                     {{ Str::limit(strip_tags($thread->body), 200, '...') }}
                 </div>

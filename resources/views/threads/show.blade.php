@@ -426,7 +426,11 @@
         <div class="thread-content">
             @if($thread->image)
                 <div class="mb-4">
-                    <img src="{{ asset($thread->image) }}" alt="Thread Image" class="img-fluid rounded">
+                    <img src="{{ asset('storage/' . $thread->image) }}"
+                         alt="Thread Image"
+                         class="img-fluid rounded"
+                         style="max-height: 500px; width: auto; object-fit: cover;"
+                         onerror="this.style.display='none'">
                 </div>
             @endif
 
@@ -503,18 +507,6 @@
                 <div class="alert alert-warning">
                     <i class="fas fa-lock me-2"></i>
                     Thread ini telah dikunci. Komentar baru tidak dapat ditambahkan.
-                </div>
-            @endif
-
-            {{-- Debug info untuk development --}}
-            @if(config('app.debug'))
-                <div class="alert alert-info small mb-3">
-                    <strong>Debug Info:</strong><br>
-                    Thread ID: {{ $thread->id }}<br>
-                    Total Comments: {{ $totalComments ?? 'undefined' }}<br>
-                    Comments Variable: {{ isset($comments) ? 'defined (' . $comments->count() . ' items)' : 'undefined' }}<br>
-                    User Authenticated: {{ Auth::check() ? 'Yes' : 'No' }}<br>
-                    Comments Store Route: {{ route('comments.store', $thread) }}
                 </div>
             @endif
 
@@ -939,14 +931,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Re-initialize after dynamic content is loaded
     window.reinitializeComments = initializeComments;
-
-    // Debug info
-    console.log('Debug Info:');
-    console.log('- Thread ID:', {{ $thread->id ?? 'null' }});
-    console.log('- Total Comments:', {{ $totalComments ?? 'undefined' }});
-    console.log('- Comments Variable:', {{ isset($comments) ? '"defined with ' . $comments->count() . ' items"' : '"undefined"' }});
-    console.log('- User Authenticated:', {{ Auth::check() ? 'true' : 'false' }});
-    console.log('- Thread Locked:', {{ ($thread->is_locked ?? false) ? 'true' : 'false' }});
 });
 </script>
 @endpush
